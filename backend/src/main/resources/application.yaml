@@ -15,8 +15,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/central_dashboard
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:Tushar}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
       minimum-idle: ${DB_POOL_MIN_IDLE:10}
@@ -33,7 +33,7 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:Hk+M0jD3QYpGOou7IaKDyKLUpktNfYGeE0/WWTMo6bbJokPVzUYWO5GlWYDBKQg9}
+    secret: ${JWT_SECRET:}
     expiration-ms: 86400000
     refresh-expiration-ms: 604800000
 
@@ -46,8 +46,8 @@ app:
       enabled: ${DOMAIN_VALIDATION_ENABLED:false}
 
   super-admin:
-    email: ${SUPER_ADMIN_EMAIL:admin@veenagroup.com}
-    password: ${SUPER_ADMIN_PASSWORD:Admin@123}
+    email: ${SUPER_ADMIN_EMAIL:}
+    password: ${SUPER_ADMIN_PASSWORD:}
     name: "Super Admin"
 
 logging:

@@ -1,0 +1,394 @@
+<div>
+  <div class="flex items-center justify-between gap-3 pb-4">
+    <div>
+      <h4 class="card-title">Gallery</h4>
+      <p class="text-sm text-muted-foreground">Photos shared across society albums</p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm inline-flex items-center gap-1.5" (click)="openCreateModal()">
+      <app-icon name="plus" [size]="14" />
+      Add Photo
+    </button>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-3 rounded-lg bg-muted/20 px-4 py-3 mb-4">
+    <select class="input h-10 sm:w-52" [value]="albumFilter()" (change)="setAlbumFilter($any($event.target).value)">
+      <option value="">All Albums</option>
+      @for (category of categories(); track category.id) {
+        <option [value]="category.id">{{ category.name }}</option>
+      }
+    </select>
+
+    @if (hasActiveFilters()) {
+      <button type="button" class="btn btn-ghost btn-sm ml-auto shrink-0 text-muted-foreground" (click)="clearFilters()">
+        Clear Filters
+      </button>
+    }
+  </div>
+
+  <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    @for (item of rows(); track item.id) {
+      <div class="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-primary/20 hover:shadow-lg">
+        <button type="button" class="relative block aspect-square w-full cursor-pointer overflow-hidden" (click)="openZoom(item)" aria-label="Zoom photo" title="Click to zoom">
+          <app-secure-image
+            [src]="galleryImageUrl(item.attachmentPath)"
+            cssClass="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            [alt]="item.title || 'Gallery photo'" />
+          <span class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+          <span class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <app-icon name="eye" [size]="22" class="text-white drop-shadow" />
+          </span>
+          @if (item.albumName) {
+            <span class="absolute left-2 top-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+              {{ item.albumName }}
+            </span>
+          }
+        </button>
+
+        <div class="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <button type="button" class="btn btn-sm h-8 w-8 p-0 rounded-full bg-white/90 text-muted-foreground shadow-sm hover:bg-white hover:text-primary" (click)="openEditModal(item)" aria-label="Edit photo" title="Edit">
+            <app-icon name="edit" [size]="14" />
+          </button>
+          <button type="button" class="btn btn-sm h-8 w-8 p-0 rounded-full bg-white/90 text-muted-foreground shadow-sm hover:bg-white hover:text-destructive" [disabled]="deletingGalleryId() === item.id" (click)="requestDeleteGalleryItem(item)" aria-label="Remove photo" title="Remove">
+            <app-icon name="trash" [size]="14" />
+          </button>
+        </div>
+
+        <div class="border-t border-border/60 p-3.5">
+          <p class="truncate text-sm font-semibold text-foreground">{{ item.title || 'Untitled' }}</p>
+          @if (item.description) {
+            <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{{ item.description }}</p>
+          }
+        </div>
+      </div>
+    } @empty {
+      @if (loading()) {
+        @for (i of [1,2,3,4,5]; track i) {
+          <div class="overflow-hidden rounded-2xl border border-border">
+            <div class="skeleton aspect-square w-full rounded-none"></div>
+            <div class="p-3 space-y-2">
+              <div class="skeleton h-4 w-2/3"></div>
+              <div class="skeleton h-3 w-1/2"></div>
+            </div>
+          </div>
+        }
+      } @else if (hasActiveFilters()) {
+        <div class="col-span-full">
+          <div class="rounded-2xl border border-dashed border-border px-6 py-10 text-center">
+            <h5 class="text-base font-semibold text-foreground">No photos in this album</h5>
+            <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different album or clear the filter.</p>
+            <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
+          </div>
+        </div>
+      } @else {
+        <div class="col-span-full">
+          <div class="rounded-2xl border border-dashed border-border px-6 py-10 text-center">
+            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <app-icon name="gallery" [size]="24" />
+            </div>
+            <h5 class="text-base font-semibold text-foreground">No photos in gallery yet</h5>
+            <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Start building this album by uploading society event photos, announcements, or celebration highlights.
+            </p>
+            <button type="button" class="btn btn-primary btn-sm mt-5 inline-flex items-center gap-1.5" (click)="openCreateModal()">
+              <app-icon name="plus" [size]="14" />
+              Upload First Photo
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="mt-4">
+    <app-pagination
+      [page]="page()" [totalPages]="totalPages()" [first]="first()" [last]="last()"
+      (prev)="load(page() - 1)" (next)="load(page() + 1)" />
+  </div>
+</div>
+
+@if (showCreateModal()) {
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeCreateModal()">
+    <div class="card w-full max-w-2xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+      <div class="card-header">
+        <div>
+          <h4 class="card-title">Add Photos</h4>
+          <p class="text-sm text-muted-foreground">Upload one or more photos to a gallery album</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeCreateModal()" aria-label="Close modal" title="Close">
+          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+        </button>
+      </div>
+
+      <div class="p-5">
+        <form [formGroup]="createForm" (ngSubmit)="createGalleryItem()" class="space-y-5">
+          <div class="form-layout">
+            <section class="form-section">
+              <div class="form-section-heading">Album Details</div>
+              <div class="form-section-fields">
+                <div class="form-field-full">
+                  <label class="label required" for="galleryAlbum">Album</label>
+                  <select id="galleryAlbum" class="input" formControlName="albumId" [disabled]="categoriesLoading() || categories().length === 0">
+                    @if (categories().length === 0) {
+                      <option [value]="0">No albums available</option>
+                    }
+                    @for (category of categories(); track category.id) {
+                      <option [value]="category.id">{{ category.name }}</option>
+                    }
+                  </select>
+                </div>
+
+                <div class="form-field-full">
+                  <label class="label" for="galleryTitle">Title</label>
+                  <input id="galleryTitle" type="text" class="input" formControlName="title" placeholder="e.g. Independence Day celebration">
+                </div>
+
+                <div class="form-field-full">
+                  <label class="label" for="galleryDescription">Description</label>
+                  <textarea id="galleryDescription" rows="3" class="input !h-auto" formControlName="description" placeholder="Add more details about this photo"></textarea>
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="form-section-heading">Upload Photos</div>
+              <div class="form-section-fields">
+                <div class="form-field-full">
+                  <label class="label required" for="galleryFile">Photo</label>
+                  <div
+                    class="dropzone"
+                    [class.dropzone-active]="uploadDragActive()"
+                    (dragover)="onUploadDragOver($event)"
+                    (dragleave)="onUploadDragLeave($event)"
+                    (drop)="onUploadDrop($event)">
+                    <p class="text-sm font-medium text-foreground mb-1">Drag and drop photo here</p>
+                    <p class="text-xs text-muted-foreground mb-3">PNG, JPG or JPEG. Max 10 MB, min 400x400 px.</p>
+                    <div class="upload-actions">
+                      <label for="galleryFile" class="btn btn-outline btn-sm cursor-pointer">
+                        {{ selectedImages().length ? 'Add More Photos' : 'Choose Photos' }}
+                      </label>
+                      @if (selectedImages().length) {
+                        <button type="button" class="btn btn-soft-secondary btn-sm" (click)="clearSelectedGalleryImages()">Clear All</button>
+                      }
+                    </div>
+                    <input id="galleryFile" type="file" class="hidden" multiple accept="image/*" (change)="onFileSelected($event)">
+                    @if (selectedImages().length) {
+                      <div class="upload-file-list mt-3">
+                        @for (item of selectedImages(); track $index) {
+                          <div class="upload-file-row">
+                            <div>
+                              <p class="text-xs text-foreground font-medium">{{ item.name }}</p>
+                              <div class="upload-meta mt-1">
+                                <span class="upload-chip">{{ item.type }}</span>
+                                <span class="upload-chip">{{ item.sizeLabel }}</span>
+                              </div>
+                            </div>
+                            <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-remove" (click)="removeSelectedGalleryImage($index)" aria-label="Remove selected photo" title="Remove">
+                              <app-icon name="trash" [size]="14" />
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                @if (selectedImages().length) {
+                  <div class="form-field-full">
+                    <p class="text-xs text-muted-foreground mb-2">Previews</p>
+                    <div class="upload-preview-grid">
+                      @for (item of selectedImages(); track $index) {
+                        <img [src]="item.previewUrl" alt="Gallery preview" class="upload-preview upload-preview-tile">
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="form-section-heading">Visibility Settings</div>
+              <div class="form-section-fields">
+                <div class="form-toggle-row">
+                  <input id="galleryPublic" type="checkbox" class="toggle-input" formControlName="isPublic">
+                  <label for="galleryPublic" class="text-sm text-foreground">Public</label>
+                </div>
+
+                <div class="form-toggle-row">
+                  <input id="galleryDownloadable" type="checkbox" class="toggle-input" formControlName="downloadable">
+                  <label for="galleryDownloadable" class="text-sm text-foreground">Downloadable</label>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary" [disabled]="creating() || categories().length === 0 || createForm.invalid || !selectedImages().length">
+              @if (creating()) { Uploading... } @else { Add Photo }
+            </button>
+            <button type="button" class="btn btn-soft-secondary" (click)="closeCreateModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+}
+
+<app-confirm-modal
+  [open]="!!galleryPendingDelete()"
+  title="Remove Photo"
+  message="Remove this photo from gallery? This action cannot be undone."
+  confirmLabel="Remove"
+  cancelLabel="Cancel"
+  [confirming]="!!deletingGalleryId()"
+  (cancelAction)="closeDeleteGalleryConfirm()"
+  (confirmAction)="confirmDeleteGalleryItem()"></app-confirm-modal>
+
+@if (showEditModal()) {
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeEditModal()">
+    <div class="card w-full max-w-2xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+      <div class="card-header">
+        <div>
+          <h4 class="card-title">Edit Photo</h4>
+          <p class="text-sm text-muted-foreground">Update album, title, and description</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeEditModal()" aria-label="Close modal" title="Close">
+          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+        </button>
+      </div>
+
+      <div class="p-5">
+        <form [formGroup]="editForm" (ngSubmit)="saveEditedGalleryItem()" class="space-y-5">
+          <div class="form-layout">
+            <section class="form-section">
+              <div class="form-section-heading">Album Details</div>
+              <div class="form-section-fields">
+                <div class="form-field-full">
+                  <label class="label required" for="editGalleryAlbum">Album</label>
+                  <select id="editGalleryAlbum" class="input" formControlName="albumId" [disabled]="categoriesLoading() || categories().length === 0">
+                    @if (categories().length === 0) {
+                      <option [value]="0">No albums available</option>
+                    }
+                    @for (category of categories(); track category.id) {
+                      <option [value]="category.id">{{ category.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-field-full">
+                  <label class="label" for="editGalleryTitle">Title</label>
+                  <input id="editGalleryTitle" type="text" class="input" formControlName="title">
+                </div>
+
+                <div class="form-field-full">
+                  <label class="label" for="editGalleryDescription">Description</label>
+                  <textarea id="editGalleryDescription" rows="3" class="input !h-auto" formControlName="description"></textarea>
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="form-section-heading">Photo</div>
+              <div class="form-section-fields">
+                <div class="form-field-full">
+                  <p class="text-xs text-muted-foreground mb-2">Current image</p>
+                  @if (editingImagePath(); as imagePath) {
+                    <app-secure-image [src]="galleryImageUrl(imagePath)" cssClass="gallery-thumb" alt="Current gallery image" />
+                  }
+                </div>
+
+                <div class="form-field-full">
+                  <label class="label" for="editGalleryImage">Replace image</label>
+                  <div
+                    class="dropzone"
+                    [class.dropzone-active]="editUploadDragActive()"
+                    (dragover)="onEditImageDragOver($event)"
+                    (dragleave)="onEditImageDragLeave($event)"
+                    (drop)="onEditImageDrop($event)">
+                    <p class="text-sm font-medium text-foreground mb-1">Drag and drop new image here</p>
+                    <p class="text-xs text-muted-foreground mb-3">PNG, JPG or JPEG. Max 10 MB, min 400x400 px.</p>
+                    <div class="upload-actions">
+                      <label for="editGalleryImage" class="btn btn-outline btn-sm cursor-pointer">
+                        {{ editReplacementImage() ? 'Choose Different Image' : 'Choose New Image' }}
+                      </label>
+                      @if (editReplacementImage()) {
+                        <button type="button" class="btn btn-soft-secondary btn-sm" (click)="clearEditReplacementImage()">Clear</button>
+                      }
+                    </div>
+                    <input id="editGalleryImage" type="file" class="hidden" accept="image/*" (change)="onEditImageSelected($event)">
+                  </div>
+
+                  @if (editReplacementImage(); as replacement) {
+                    <div class="upload-file-list mt-3">
+                      <div class="upload-file-row">
+                        <div>
+                          <p class="text-xs text-foreground font-medium">{{ replacement.name }}</p>
+                          <div class="upload-meta mt-1">
+                            <span class="upload-chip">{{ replacement.type }}</span>
+                            <span class="upload-chip">{{ replacement.sizeLabel }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mt-3">
+                      <p class="text-xs text-muted-foreground mb-2">New image preview</p>
+                      <img [src]="replacement.previewUrl" alt="Replacement image preview" class="upload-preview upload-preview-tile" />
+                    </div>
+                  }
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="form-section-heading">Visibility Settings</div>
+              <div class="form-section-fields">
+                <div class="form-toggle-row">
+                  <input id="editGalleryPublic" type="checkbox" class="toggle-input" formControlName="isPublic">
+                  <label for="editGalleryPublic" class="text-sm text-foreground">Public</label>
+                </div>
+                <div class="form-toggle-row">
+                  <input id="editGalleryDownloadable" type="checkbox" class="toggle-input" formControlName="downloadable">
+                  <label for="editGalleryDownloadable" class="text-sm text-foreground">Downloadable</label>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          @if (editError()) {
+            <p class="text-sm text-destructive">{{ editError() }}</p>
+          }
+
+          <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary" [disabled]="updating() || categories().length === 0 || editForm.invalid">
+              @if (updating()) { Saving... } @else { Save Changes }
+            </button>
+            <button type="button" class="btn btn-soft-secondary" (click)="closeEditModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+}
+
+@if (zoomTarget(); as target) {
+  <div class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeZoom()">
+    <div class="w-full max-w-4xl" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div class="min-w-0">
+          @if (target.albumName) {
+            <span class="mb-1.5 inline-block rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/80">{{ target.albumName }}</span>
+          }
+          <p class="truncate text-base font-semibold text-white sm:text-lg">{{ target.title || 'Untitled' }}</p>
+          @if (target.description) {
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-white/70">{{ target.description }}</p>
+          }
+        </div>
+        <button type="button" class="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" (click)="closeZoom()" aria-label="Close" title="Close">
+          <span aria-hidden="true" class="text-xl leading-none">&times;</span>
+        </button>
+      </div>
+      <app-secure-image [src]="galleryImageUrl(target.attachmentPath)" cssClass="w-full max-h-[80vh] object-contain rounded-lg" [alt]="target.title || 'Gallery photo'" />
+    </div>
+  </div>
+}

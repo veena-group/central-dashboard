@@ -1,0 +1,181 @@
+<div class="space-y-5">
+  <section class="border-b border-border pb-4">
+    <div class="flex flex-wrap gap-2">
+      @for (type of categoryTypes(); track type) {
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="selectedType() === type"
+          [class.btn-outline]="selectedType() !== type"
+          (click)="setType(type)">
+          {{ getTypeLabel(type) }}
+        </button>
+      }
+    </div>
+  </section>
+
+  @if (categoryTypes().length === 0) {
+    <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
+      <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <app-icon name="categories" [size]="22" />
+      </div>
+      <h5 class="text-base font-semibold text-foreground">No categorized features are enabled</h5>
+      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+        Ask your platform admin to enable Notices, Documents, Forms, Meetings, or Gallery for this society to manage their categories.
+      </p>
+    </div>
+  } @else {
+
+  <section class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div>
+      <h4 class="text-lg font-semibold text-foreground">{{ getTypeLabel(selectedType()) }} Categories</h4>
+      <p class="text-sm text-muted-foreground mt-1">{{ getTypeDescription(selectedType()) }}</p>
+    </div>
+    <button type="button" class="btn btn-primary shrink-0" (click)="openAddModal()">Add Category</button>
+  </section>
+
+  <section class="space-y-3">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+      <input
+        type="text"
+        class="input"
+        [value]="searchText()"
+        (input)="setSearch($any($event.target).value)"
+        placeholder="Search category name">
+
+      <div class="flex items-center justify-between lg:justify-end gap-4 shrink-0">
+        <label for="activeOnly" class="flex items-center gap-2 text-sm text-foreground">
+          <input
+            id="activeOnly"
+            type="checkbox"
+            class="toggle-input"
+            [checked]="activeOnly()"
+            (change)="setActiveOnly($any($event.target).checked)">
+          Active only
+        </label>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-muted-foreground">Active: {{ activeCount() }}</span>
+          <span class="text-xs text-muted-foreground">|</span>
+          <span class="text-xs text-muted-foreground">Inactive: {{ inactiveCount() }}</span>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="table-base">
+        <thead>
+          <tr>
+            <th>Category Name</th>
+            <th>Status</th>
+            <th class="text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of filteredRows(); track row.id) {
+            <tr>
+              <td class="font-medium text-foreground">{{ row.name }}</td>
+              <td>
+                <span [class]="row.active ? 'badge badge-soft-success' : 'badge badge-soft-secondary'">
+                  {{ row.active ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td class="text-right">
+                <input
+                  type="checkbox"
+                  class="toggle-input"
+                  [checked]="row.active"
+                  [disabled]="saving()"
+                  (change)="onToggleActive(row, $any($event.target).checked)"
+                  [attr.aria-label]="row.active ? 'Deactivate ' + row.name : 'Activate ' + row.name">
+              </td>
+            </tr>
+          } @empty {
+            @if (loading()) {
+              @for (i of [1,2,3,4]; track i) {
+                <tr>
+                  <td><div class="skeleton h-4 w-32"></div></td>
+                  <td><div class="skeleton h-5 w-16"></div></td>
+                  <td class="text-right"><div class="skeleton h-6 w-11 ml-auto"></div></td>
+                </tr>
+              }
+            } @else {
+              <tr>
+                <td colspan="3" class="py-8 px-4">
+                  <div class="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-8 text-center">
+                    <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm ring-1 ring-border">
+                      <app-icon name="categories" [size]="22" />
+                    </div>
+                    <h5 class="text-base font-semibold text-foreground">No categories for this type</h5>
+                    <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                      Create a category to organize {{ getTypeLabel(selectedType()) }} records more effectively.
+                    </p>
+                    <button type="button" class="btn btn-primary btn-sm mt-4" (click)="openAddModal()">Add Category</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <app-pagination
+      [page]="page()"
+      [totalPages]="totalPages()"
+      [first]="first()"
+      [last]="last()"
+      (prev)="load(page() - 1)"
+      (next)="load(page() + 1)" />
+  </div>
+
+  @if (showAddModal()) {
+    <div class="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm grid place-items-center p-4" (click)="closeAddModal()">
+      <div class="card w-full max-w-lg" (click)="$event.stopPropagation()">
+        <div class="card-header">
+          <div>
+            <h5 class="card-title">Add Category</h5>
+            <p class="text-xs text-muted-foreground">Type: {{ getTypeLabel(selectedType()) }}</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeAddModal()" aria-label="Close modal" title="Close">
+            <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+          </button>
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="createCategory()" class="p-5 space-y-4">
+          <div>
+            <label class="label required" for="newCategoryName">Category Name</label>
+            <input
+              id="newCategoryName"
+              type="text"
+              class="input"
+              formControlName="name"
+              placeholder="Enter category name">
+            @if (form.controls.name.invalid && form.controls.name.touched) {
+              <p class="mt-1 text-xs text-destructive">Category name must be at least 2 characters.</p>
+            }
+          </div>
+
+          <div class="flex items-center justify-end gap-2">
+            <button type="button" class="btn btn-outline" (click)="closeAddModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="saving() || form.invalid">Add Category</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <app-confirm-modal
+    [open]="!!pendingDeactivateCategory()"
+    title="Deactivate Category"
+    [message]="'Deactivate category ' + (pendingDeactivateCategory()?.name ?? '') + '? It will be hidden from selection lists until you reactivate it.'"
+    confirmLabel="Deactivate"
+    cancelLabel="Cancel"
+    [confirming]="saving()"
+    (cancelAction)="closeDeactivateConfirm()"
+    (confirmAction)="confirmDeactivateCategory()"></app-confirm-modal>
+  }
+</div>

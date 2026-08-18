@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: central-dashboard
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/central_dashboard
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:Tushar}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 25
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:Hk+M0jD3QYpGOou7IaKDyKLUpktNfYGeE0/WWTMo6bbJokPVzUYWO5GlWYDBKQg9}
+    expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
+
+  storage:
+    base-path: "./uploads"
+    max-bytes-per-society: ${MAX_BYTES_PER_SOCIETY:524288000}
+
+  security:
+    domain-validation:
+      enabled: ${DOMAIN_VALIDATION_ENABLED:false}
+
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:admin@veenagroup.com}
+    password: ${SUPER_ADMIN_PASSWORD:Admin@123}
+    name: "Super Admin"
+
+logging:
+  level:
+    root: INFO
+    com.veenagroup.central.dashboard: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"
+  file:
+    name: "./logs/central-dashboard.log"
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

@@ -1,0 +1,50 @@
+@if (open()) {
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="close()">
+    <div class="card w-full max-w-5xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+      <div class="card-header">
+        <div>
+          <h4 class="card-title">Attachment Preview</h4>
+          <p class="text-sm text-muted-foreground">{{ fileName() }}</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="close()" aria-label="Close preview" title="Close">
+          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+        </button>
+      </div>
+      <div class="p-5">
+        @if (loading()) {
+          <div class="text-sm text-muted-foreground">Loading preview...</div>
+        } @else if (error()) {
+          <div class="text-sm text-destructive">{{ error() }}</div>
+        } @else {
+          @if (mode() === 'image') {
+            <img [src]="objectUrl()" [alt]="fileName()" class="max-h-[70vh] w-full object-contain rounded-lg border border-border" />
+          }
+          @if (mode() === 'pdf') {
+            <!-- No sandbox attribute: Chrome's built-in PDF viewer extension refuses to render at all
+                 inside a sandboxed frame (even with allow-scripts allow-same-origin, which Chrome itself
+                 warns "can escape its sandboxing" and simply declines to use). The real security boundary
+                 here isn't iframe sandboxing - it's that the backend only ever serves this endpoint with
+                 Content-Type: application/pdf plus X-Content-Type-Options: nosniff for files that passed
+                 PDF-only upload validation, so the browser can never reinterpret the bytes as HTML/script
+                 regardless of how this frame is embedded. -->
+            <iframe [src]="safeUrl()" class="w-full h-[70vh] rounded-lg border border-border" title="Attachment preview"></iframe>
+          }
+          @if (mode() === 'unsupported') {
+            <div class="h-[70vh] rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center p-6 text-center">
+              <div>
+                <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm ring-1 ring-border">
+                  <app-icon name="documents" [size]="22" />
+                </div>
+                <h5 class="text-base font-semibold text-foreground">Preview is not available for this file type</h5>
+                <p class="mt-2 text-sm text-muted-foreground">
+                  This attachment format cannot be displayed inside the browser. Please use the download button from the attachment list.
+                </p>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}

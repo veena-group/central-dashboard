@@ -1,0 +1,110 @@
+<div>
+  <div class="pb-4">
+    <h4 class="card-title">Gallery</h4>
+    <p class="text-sm text-muted-foreground">Photos shared across society albums</p>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-3 rounded-lg bg-muted/20 px-4 py-3 mb-4">
+    <select class="input h-10 sm:w-52" [value]="albumFilter()" (change)="setAlbumFilter($any($event.target).value)">
+      <option value="">All Albums</option>
+      @for (category of categories(); track category.id) {
+        <option [value]="category.id">{{ category.name }}</option>
+      }
+    </select>
+
+    @if (hasActiveFilters()) {
+      <button type="button" class="btn btn-ghost btn-sm ml-auto shrink-0 text-muted-foreground" (click)="clearFilters()">
+        Clear Filters
+      </button>
+    }
+  </div>
+
+  <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    @for (item of rows(); track item.id) {
+      <div class="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-primary/20 hover:shadow-lg">
+        <button type="button" class="relative block aspect-square w-full cursor-pointer overflow-hidden" (click)="openZoom(item)" aria-label="Zoom photo" title="Click to zoom">
+          <app-secure-image
+            [src]="viewUrl(item.id)"
+            cssClass="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            [alt]="item.title || 'Gallery photo'" />
+          <span class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+          <span class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <app-icon name="eye" [size]="22" class="text-white drop-shadow" />
+          </span>
+          @if (item.albumName) {
+            <span class="absolute left-2 top-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+              {{ item.albumName }}
+            </span>
+          }
+        </button>
+        <div class="border-t border-border/60 p-3.5">
+          <p class="truncate text-sm font-semibold text-foreground">{{ item.title || 'Untitled' }}</p>
+          @if (item.description) {
+            <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{{ item.description }}</p>
+          }
+        </div>
+      </div>
+    } @empty {
+      @if (loading()) {
+        @for (i of [1,2,3,4,5]; track i) {
+          <div class="overflow-hidden rounded-2xl border border-border">
+            <div class="skeleton aspect-square w-full rounded-none"></div>
+            <div class="p-3 space-y-2">
+              <div class="skeleton h-4 w-2/3"></div>
+              <div class="skeleton h-3 w-1/2"></div>
+            </div>
+          </div>
+        }
+      } @else if (hasActiveFilters()) {
+        <div class="col-span-full">
+          <div class="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
+            <h5 class="text-base font-semibold text-foreground">No photos in this album</h5>
+            <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different album or clear the filter.</p>
+            <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
+          </div>
+        </div>
+      } @else {
+        <div class="col-span-full">
+          <div class="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
+            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm ring-1 ring-border">
+              <app-icon name="gallery" [size]="24" />
+            </div>
+            <h5 class="text-base font-semibold text-foreground">No photos available yet</h5>
+            <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Society album photos will appear here once they are uploaded and shared with members.
+            </p>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="mt-4">
+    <app-pagination
+      [page]="page()" [totalPages]="totalPages()" [first]="first()" [last]="last()"
+      (prev)="load(page() - 1)" (next)="load(page() + 1)" />
+  </div>
+</div>
+
+@if (zoomTarget(); as target) {
+  <div class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeZoom()">
+    <div class="w-full max-w-4xl" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div class="min-w-0">
+          @if (target.albumName) {
+            <span class="mb-1.5 inline-block rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/80">{{ target.albumName }}</span>
+          }
+          <p class="truncate text-base font-semibold text-white sm:text-lg">{{ target.title || 'Untitled' }}</p>
+          @if (target.description) {
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-white/70">{{ target.description }}</p>
+          }
+        </div>
+        <button type="button" class="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20" (click)="closeZoom()" aria-label="Close" title="Close">
+          <span aria-hidden="true" class="text-xl leading-none">&times;</span>
+        </button>
+      </div>
+      <app-secure-image [src]="viewUrl(target.id)" cssClass="w-full max-h-[80vh] object-contain rounded-lg" [alt]="target.title || 'Gallery photo'" />
+    </div>
+  </div>
+}

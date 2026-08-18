@@ -1,0 +1,262 @@
+<div class="card overflow-hidden">
+  <div class="card-header">
+    <div>
+      <h4 class="card-title">Societies</h4>
+      <p class="text-sm text-muted-foreground">All societies onboarded on the platform</p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="openAddModal()">+ Add Society</button>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-border bg-muted/20">
+    <div class="flex h-10 items-center gap-2 rounded-lg border border-input bg-background px-3 w-full sm:flex-1 sm:min-w-[220px]">
+      <app-icon name="search" [size]="16" class="text-muted-foreground flex-shrink-0" />
+      <input
+        type="search"
+        [formControl]="searchControl"
+        placeholder="Search by name or domain"
+        class="w-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground">
+    </div>
+
+    <div class="relative">
+      <span class="pointer-events-none absolute left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
+            [class]="dotClass(hostingStateFilter() ? hostingVariant(hostingStateFilter()) : '')"></span>
+      <select
+        class="input h-10 w-full appearance-none !pl-7 !pr-9 sm:w-48"
+        [value]="hostingStateFilter()"
+        (change)="setHostingStateFilter($any($event.target).value)">
+        <option value="">All Hosting States</option>
+        @for (state of hostingStateOptions; track state) {
+          <option [value]="state">{{ state.replace('_', ' ') }}</option>
+        }
+      </select>
+      <app-icon name="chevron-right" [size]="14" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-muted-foreground" />
+    </div>
+
+    <div class="relative">
+      <span class="pointer-events-none absolute left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
+            [class]="dotClass(subscriptionStateFilter() ? subscriptionVariant(subscriptionStateFilter()) : '')"></span>
+      <select
+        class="input h-10 w-full appearance-none !pl-7 !pr-9 sm:w-48"
+        [value]="subscriptionStateFilter()"
+        (change)="setSubscriptionStateFilter($any($event.target).value)">
+        <option value="">All Subscription States</option>
+        @for (state of subscriptionStateOptions; track state) {
+          <option [value]="state">{{ state.replace('_', ' ') }}</option>
+        }
+      </select>
+      <app-icon name="chevron-right" [size]="14" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-muted-foreground" />
+    </div>
+
+    @if (hasActiveFilters()) {
+      <button type="button" class="btn btn-ghost btn-sm ml-auto shrink-0 text-muted-foreground" (click)="clearFilters()">
+        Clear Filters
+      </button>
+    }
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="table-base">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Domain</th>
+          <th>Hosting</th>
+          <th>Subscription</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (society of rows(); track society.id) {
+          <tr>
+            <td class="font-medium text-foreground">{{ society.name }}</td>
+            <td class="text-muted-foreground">{{ society.domain }}</td>
+            <td>
+              <span [class]="'badge badge-soft-' + hostingVariant(society.hostingState)">{{ society.hostingState.replace('_', ' ') }}</span>
+              <div class="mt-0.5 text-xs text-muted-foreground">{{ society.currentHostingExpiry || 'No renewal recorded' }}</div>
+            </td>
+            <td>
+              <span [class]="'badge badge-soft-' + subscriptionVariant(society.subscriptionState)">{{ society.subscriptionState.replace('_', ' ') }}</span>
+              <div class="mt-0.5 text-xs text-muted-foreground">{{ society.currentNextDueDate || 'No payment recorded' }}</div>
+            </td>
+            <td>
+              <a [routerLink]="['/super-admin/societies', society.id]" class="btn btn-outline btn-sm">Manage</a>
+            </td>
+          </tr>
+        } @empty {
+          @if (loading()) {
+            @for (i of [1,2,3,4]; track i) {
+              <tr>
+                <td><div class="skeleton h-4 w-32"></div></td>
+                <td><div class="skeleton h-4 w-28"></div></td>
+                <td><div class="skeleton h-5 w-20"></div></td>
+                <td><div class="skeleton h-5 w-20"></div></td>
+                <td><div class="skeleton h-8 w-16 rounded-md"></div></td>
+              </tr>
+            }
+          } @else {
+            <tr><td colspan="5" class="text-center text-muted-foreground py-6">
+              {{ hasActiveFilters() ? 'No societies match your filters' : 'No societies onboarded yet' }}
+            </td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-pagination
+    [page]="page()" [totalPages]="totalPages()" [first]="first()" [last]="last()"
+    (prev)="load(page() - 1)" (next)="load(page() + 1)" />
+</div>
+
+@if (showAddModal()) {
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeAddModal()">
+    <div #modalCard class="card w-full max-w-4xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+      <div class="card-header">
+        <div>
+          <h4 class="card-title">Add Society</h4>
+          <p class="text-sm text-muted-foreground">Create a society and its first admin account</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeAddModal()" aria-label="Close modal" title="Close">
+          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+        </button>
+      </div>
+
+      <div class="p-5">
+        <form [formGroup]="form" (ngSubmit)="submitAddSociety()" class="space-y-5">
+          @if (createError()) {
+            <p class="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">{{ createError() }}</p>
+          }
+
+          <div class="form-layout">
+            <section class="form-section">
+              <div class="form-section-heading">Society Details</div>
+              <div class="form-section-fields">
+                <div>
+                  <label class="label required" for="societyName">Society Name</label>
+                  <input id="societyName" type="text" class="input" formControlName="societyName" placeholder="e.g. Green Meadows CHS">
+                </div>
+                <div>
+                  <label class="label required" for="domain">Domain</label>
+                  <input id="domain" type="text" class="input" formControlName="domain" placeholder="mysociety.example.com">
+                </div>
+                <div>
+                  <label class="label required" for="domainStartDate">Domain Purchased On</label>
+                  <input id="domainStartDate" type="date" class="input" formControlName="domainStartDate">
+                </div>
+                <div>
+                  <label class="label required" for="domainExpiryDate">Domain Expiry Date</label>
+                  <input id="domainExpiryDate" type="date" class="input" formControlName="domainExpiryDate">
+                </div>
+                <div class="form-field-full">
+                  <label class="label" for="societyLogo">Logo (optional)</label>
+                  <div
+                    class="dropzone"
+                    [class.dropzone-active]="logoDragActive()"
+                    (dragover)="onLogoDragOver($event)"
+                    (dragleave)="onLogoDragLeave($event)"
+                    (drop)="onLogoDrop($event)">
+                    <p class="text-sm font-medium text-foreground mb-1">Drag and drop logo here</p>
+                    <p class="text-xs text-muted-foreground mb-3">PNG, JPG or JPEG. Max 5 MB.</p>
+                    <div class="upload-actions">
+                      <label for="societyLogo" class="btn btn-outline btn-sm cursor-pointer">
+                        {{ logoFile() ? 'Replace Logo' : 'Choose Logo' }}
+                      </label>
+                      @if (logoFile()) {
+                        <button type="button" class="btn btn-soft-secondary btn-sm" (click)="clearLogoSelection()">Remove</button>
+                      }
+                    </div>
+                    <input id="societyLogo" type="file" class="hidden" accept="image/*" (change)="onLogoFileChange($event)">
+                    @if (logoFile(); as file) {
+                      <div class="upload-file-list mt-3">
+                        <div class="upload-file-row">
+                          <div class="flex items-center gap-3">
+                            @if (logoPreviewUrl(); as url) {
+                              <img [src]="url" alt="Logo preview" class="h-10 w-10 rounded-lg object-cover border border-border" />
+                            }
+                            <p class="text-xs text-foreground font-medium">{{ file.name }}</p>
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                  @if (logoError()) {
+                    <p class="mt-2 text-xs text-destructive">{{ logoError() }}</p>
+                  }
+                </div>
+                <div>
+                  <label class="label" for="primaryColor">Primary Color</label>
+                  <input id="primaryColor" type="text" class="input" formControlName="primaryColor" placeholder="#0F766E">
+                </div>
+                <div>
+                  <label class="label" for="secondaryColor">Secondary Color</label>
+                  <input id="secondaryColor" type="text" class="input" formControlName="secondaryColor" placeholder="#F59E0B">
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="form-section-heading">First Admin Account</div>
+              <div class="form-section-fields">
+                <div>
+                  <label class="label required" for="adminName">Admin Name</label>
+                  <input id="adminName" type="text" class="input" formControlName="adminName" placeholder="e.g. Amit Verma">
+                </div>
+                <div>
+                  <label class="label required" for="adminEmail">Admin Email</label>
+                  <input id="adminEmail" type="email" class="input" formControlName="adminEmail" placeholder="amit@example.com">
+                </div>
+                <div>
+                  <label class="label" for="adminPhone">Admin Phone</label>
+                  <input id="adminPhone" type="text" class="input" formControlName="adminPhone" placeholder="e.g. 9876543210">
+                </div>
+                <div>
+                  <label class="label" for="adminPassword">Admin Password (auto-generated)</label>
+                  <input id="adminPassword" type="text" class="input" formControlName="adminPassword" readonly>
+                  <p class="mt-1 text-xs text-muted-foreground">Generated from the admin's first name (FirstName@123). Share this with the admin so they can sign in and change it later.</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="form-section-heading">Feature Access</div>
+              <div class="overflow-x-auto">
+                <table class="table-base">
+                  <thead>
+                    <tr>
+                      <th>Feature</th>
+                      <th>Enabled</th>
+                      <th>Usage Limit</th>
+                    </tr>
+                  </thead>
+                  <tbody [formGroup]="form">
+                    <ng-container formArrayName="features">
+                      @for (control of featureControls; track control; let i = $index) {
+                        <tr [formGroupName]="i">
+                          <td class="font-medium text-foreground">{{ featureKeys[i] }}</td>
+                          <td><input type="checkbox" class="toggle-input" formControlName="enabled" (change)="onFeatureToggle(i, $event)"></td>
+                          <td>
+                            <input #limitInput type="number" min="1" class="input !h-9 !w-32" formControlName="limit" placeholder="e.g. 200">
+                            @if (control.errors?.['limitRequired'] && control.touched) {
+                              <div><small class="text-destructive text-xs">Required when enabled</small></div>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </ng-container>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary" [disabled]="creating() || form.invalid">
+              @if (creating()) { Onboarding... } @else { Add Society }
+            </button>
+            <button type="button" class="btn btn-soft-secondary" (click)="closeAddModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+}

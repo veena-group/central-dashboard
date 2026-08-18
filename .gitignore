@@ -1,0 +1,58 @@
+# ------------------------------
+# OS / Editor
+# ------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ------------------------------
+# Environment / Secrets
+# ------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# ------------------------------
+# Logs
+# ------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------
+# Backend (Spring Boot / Maven)
+# ------------------------------
+backend/target/
+backend/logs/
+backend/uploads/
+
+# Optional Maven/Java build leftovers
+**/build/
+**/out/
+
+# ------------------------------
+# Frontend (Angular)
+# ------------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/cache/
+frontend/coverage/
+frontend/.sass-cache/
+frontend/tmp/
+frontend/out-tsc/
+
+# ------------------------------
+# Common dependency caches
+# ------------------------------
+**/node_modules/
+
+# ------------------------------
+# Test / tooling artifacts
+# ------------------------------
+coverage/
+.nyc_output/

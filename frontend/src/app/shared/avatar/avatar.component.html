@@ -1,0 +1,8 @@
+@if (resolvedImageUrl(); as url) {
+  <app-secure-image [src]="url" [alt]="name()" [cssClass]="sizeClass() + ' rounded-full object-cover flex-shrink-0'" />
+} @else {
+  <div
+    [class]="sizeClass() + ' bg-gradient-to-br ' + gradient() + ' rounded-full flex items-center justify-center text-white font-medium flex-shrink-0'">
+    {{ initials() }}
+  </div>
+}

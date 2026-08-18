@@ -1,0 +1,23 @@
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <a routerLink="/super-admin/societies" class="block">
+    <app-stat-card label="Total Societies" [value]="totalSocieties()" icon="building" variant="primary" [loading]="loading()" />
+  </a>
+  <a routerLink="/super-admin/societies" [queryParams]="{ subscriptionState: 'PAID_UP' }" class="block">
+    <app-stat-card label="Subscriptions Paid Up" [value]="subscriptionsPaidUp()" icon="trend-up" variant="success" [loading]="loading()" />
+  </a>
+  <a routerLink="/super-admin/societies" [queryParams]="{ hostingState: 'EXPIRING_SOON' }" class="block">
+    <app-stat-card label="Hosting Expiring Soon" [value]="hostingExpiringSoon()" icon="bell" variant="warning" [loading]="loading()" />
+  </a>
+  <a routerLink="/super-admin/societies" [queryParams]="{ hostingState: 'EXPIRED' }" class="block">
+    <app-stat-card label="Hosting Expired" [value]="hostingExpired()" icon="bell" variant="warning" [loading]="loading()" />
+  </a>
+</div>
+
+<div class="card p-5 min-w-0 overflow-hidden">
+  <h4 class="card-title mb-4">Subscription Status Breakdown</h4>
+  @if (loading()) {
+    <div class="skeleton h-[280px] w-full"></div>
+  } @else {
+    <apx-chart [series]="chartSeries" [chart]="chartOptions" [xaxis]="xaxis()" [plotOptions]="plotOptions" [colors]="chartColors"></apx-chart>
+  }
+</div>

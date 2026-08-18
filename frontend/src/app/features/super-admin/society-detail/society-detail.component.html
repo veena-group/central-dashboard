@@ -1,0 +1,458 @@
+<div class="mb-4">
+  <a routerLink="/super-admin/societies" class="text-sm text-muted-foreground hover:text-foreground transition-colors">&larr; Back to societies</a>
+</div>
+
+@if (loading()) {
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="card p-5 space-y-4">
+      <div class="skeleton h-5 w-1/3"></div>
+      @for (i of [1,2,3,4,5,6]; track i) {
+        <div class="space-y-1.5">
+          <div class="skeleton h-3 w-24"></div>
+          <div class="skeleton h-9 w-full"></div>
+        </div>
+      }
+    </div>
+    <div class="card p-5 space-y-3">
+      <div class="skeleton h-5 w-1/3"></div>
+      @for (i of [1,2,3]; track i) {
+        <div class="flex items-center gap-3">
+          <div class="skeleton h-4 w-24"></div>
+          <div class="skeleton h-6 w-11 rounded-full"></div>
+          <div class="skeleton h-9 w-28"></div>
+        </div>
+      }
+    </div>
+  </div>
+  <div class="card p-5 space-y-3">
+    <div class="skeleton h-5 w-1/4"></div>
+    @for (i of [1,2,3]; track i) {
+      <div class="skeleton h-10 w-full"></div>
+    }
+  </div>
+} @else {
+
+@if (society(); as s) {
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+    <div class="card p-4 flex items-center justify-between gap-3">
+      <div>
+        <p class="text-xs font-medium text-muted-foreground">Hosting</p>
+        @if (s.currentHostingExpiry) {
+          <p class="mt-1 text-sm text-foreground">Expires {{ s.currentHostingExpiry | date:'MMM d, y' }}</p>
+          <p class="mt-0.5 text-xs text-muted-foreground">{{ daysLabel(s.currentHostingExpiry) }}</p>
+        } @else {
+          <p class="mt-1 text-sm text-foreground">No renewal recorded</p>
+        }
+      </div>
+      <span [class]="'badge badge-soft-' + hostingVariant(s.hostingState)">{{ s.hostingState.replace('_', ' ') }}</span>
+    </div>
+    <div class="card p-4 flex items-center justify-between gap-3">
+      <div>
+        <p class="text-xs font-medium text-muted-foreground">Subscription</p>
+        @if (s.currentNextDueDate) {
+          <p class="mt-1 text-sm text-foreground">Next due {{ s.currentNextDueDate | date:'MMM d, y' }}</p>
+          <p class="mt-0.5 text-xs text-muted-foreground">{{ daysLabel(s.currentNextDueDate) }}</p>
+        } @else {
+          <p class="mt-1 text-sm text-foreground">No payment recorded</p>
+        }
+      </div>
+      <span [class]="'badge badge-soft-' + subscriptionVariant(s.subscriptionState)">{{ s.subscriptionState.replace('_', ' ') }}</span>
+    </div>
+  </div>
+}
+
+<div class="border-b border-border mb-4">
+  <nav class="flex gap-6 overflow-x-auto -mb-px">
+    <button type="button" [class]="tabButtonClass('overview')" (click)="setTab('overview')">
+      <app-icon [name]="tabIcon('overview')" [size]="16" />
+      Overview
+    </button>
+    <button type="button" [class]="tabButtonClass('domain')" (click)="setTab('domain')">
+      <app-icon [name]="tabIcon('domain')" [size]="16" />
+      Domain
+    </button>
+    <button type="button" [class]="tabButtonClass('features')" (click)="setTab('features')">
+      <app-icon [name]="tabIcon('features')" [size]="16" />
+      Features
+    </button>
+    <button type="button" [class]="tabButtonClass('admin')" (click)="setTab('admin')">
+      <app-icon [name]="tabIcon('admin')" [size]="16" />
+      Admin
+    </button>
+    <button type="button" [class]="tabButtonClass('payments')" (click)="setTab('payments')">
+      <app-icon [name]="tabIcon('payments')" [size]="16" />
+      Payments
+    </button>
+  </nav>
+</div>
+
+@if (activeTab() === 'overview') {
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">Society Details</h4>
+    </div>
+    <div class="p-5">
+      <form [formGroup]="detailsForm" (ngSubmit)="saveDetails()" class="space-y-4">
+        <div class="form-layout">
+          <section class="form-section">
+            <div class="form-section-heading">Society Details</div>
+            <div class="form-section-fields">
+              <div>
+                <label class="label required">Name</label>
+                <input type="text" class="input" formControlName="name" placeholder="e.g. Green Meadows CHS">
+              </div>
+              <div>
+                <label class="label required">Domain</label>
+                <input type="text" class="input" formControlName="domain" placeholder="mysociety.example.com">
+              </div>
+              <div>
+                <label class="label">Primary Color</label>
+                <input type="text" class="input" formControlName="primaryColor" placeholder="#0F766E">
+              </div>
+              <div>
+                <label class="label">Secondary Color</label>
+                <input type="text" class="input" formControlName="secondaryColor" placeholder="#F59E0B">
+              </div>
+            </div>
+          </section>
+        </div>
+        <button type="submit" class="btn btn-primary" [disabled]="savingDetails()">
+          @if (savingDetails()) { Saving... } @else { Save Details }
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-header">
+      <h4 class="card-title">Logo</h4>
+    </div>
+    <div class="p-5">
+      <div class="form-field-full">
+        @if (society()?.logoUrl; as currentLogo) {
+          <div class="mb-3">
+            <p class="text-xs text-muted-foreground mb-2">Current logo</p>
+            <app-secure-image [src]="mediaUrl.resolve(currentLogo)!" cssClass="h-16 w-16 rounded-lg object-cover border border-border" alt="Society logo" />
+          </div>
+        }
+        <div
+          class="dropzone"
+          [class.dropzone-active]="logoDragActive()"
+          (dragover)="onLogoDragOver($event)"
+          (dragleave)="onLogoDragLeave($event)"
+          (drop)="onLogoDrop($event)">
+          <p class="text-sm font-medium text-foreground mb-1">Drag and drop a new logo here</p>
+          <p class="text-xs text-muted-foreground mb-3">PNG, JPG or JPEG. Max 5 MB.</p>
+          <div class="upload-actions">
+            <label for="detailLogo" class="btn btn-outline btn-sm cursor-pointer">
+              {{ logoFile() ? 'Choose Different File' : 'Choose Logo' }}
+            </label>
+            @if (logoFile()) {
+              <button type="button" class="btn btn-soft-secondary btn-sm" (click)="clearLogoSelection()">Clear</button>
+            }
+          </div>
+          <input id="detailLogo" type="file" class="hidden" accept="image/*" (change)="onLogoFileChange($event)">
+          @if (logoFile(); as file) {
+            <div class="upload-file-list mt-3">
+              <div class="upload-file-row">
+                <div class="flex items-center gap-3">
+                  @if (logoPreviewUrl(); as url) {
+                    <img [src]="url" alt="Logo preview" class="h-10 w-10 rounded-lg object-cover border border-border" />
+                  }
+                  <p class="text-xs text-foreground font-medium">{{ file.name }}</p>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+        @if (logoError()) {
+          <p class="mt-2 text-xs text-destructive">{{ logoError() }}</p>
+        }
+        @if (logoFile()) {
+          <button type="button" class="btn btn-primary mt-3" [disabled]="uploadingLogo()" (click)="uploadLogo()">
+            @if (uploadingLogo()) { Uploading... } @else { Upload Logo }
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (activeTab() === 'domain') {
+  <div class="card mb-4">
+    <div class="card-header">
+      <div>
+        <h4 class="card-title">Domain &amp; Hosting</h4>
+        <p class="text-sm text-muted-foreground">Track domain purchase and renewal history so you never miss a renewal</p>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" (click)="openAddRenewalModal()">+ Renew Domain</button>
+    </div>
+    @if (society(); as s) {
+      <div class="flex flex-wrap items-center justify-between gap-4 border-t border-border px-5 py-4">
+        <div>
+          <p class="text-xs font-medium text-muted-foreground">Current Expiry</p>
+          <p class="mt-1 text-lg font-semibold text-foreground">
+            {{ s.currentHostingExpiry ? (s.currentHostingExpiry | date:'MMM d, y') : 'No renewal recorded' }}
+          </p>
+          @if (s.currentHostingExpiry) {
+            <p class="mt-0.5 text-xs text-muted-foreground">{{ daysLabel(s.currentHostingExpiry) }}</p>
+          }
+        </div>
+        <span [class]="'badge badge-soft-' + hostingVariant(s.hostingState)">{{ s.hostingState.replace('_', ' ') }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">Renewal History</h4>
+    </div>
+    <div class="p-5 space-y-3">
+      @for (renewal of domainRenewals(); track renewal.id; let first = $first) {
+        <div class="flex items-center justify-between gap-4 rounded-2xl border border-border p-4">
+          <div class="min-w-0">
+            @if (first) {
+              <span class="badge badge-soft-primary mb-2">Current</span>
+            }
+            <div class="flex flex-wrap gap-x-6 gap-y-2">
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">Renewed On</p>
+                <p class="text-sm font-semibold text-foreground">{{ renewal.startDate | date:'MMM d, y' }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">Expires On</p>
+                <p class="text-sm font-semibold text-foreground">{{ renewal.expiryDate | date:'MMM d, y' }}</p>
+              </div>
+            </div>
+            @if (renewal.notes) {
+              <p class="mt-2 text-xs text-muted-foreground">{{ renewal.notes }}</p>
+            }
+          </div>
+          <span class="whitespace-nowrap text-xs text-muted-foreground/70">Recorded {{ renewal.createdAt | date:'MMM d, y' }}</span>
+        </div>
+      } @empty {
+        <p class="text-sm text-muted-foreground text-center py-6">No domain renewals recorded yet.</p>
+      }
+    </div>
+  </div>
+}
+
+@if (activeTab() === 'features') {
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">Feature Access</h4>
+    </div>
+    <div class="p-5">
+      <div class="form-layout">
+        <section class="form-section">
+          <div class="form-section-heading">Feature Access</div>
+          <div class="overflow-x-auto">
+            <table class="table-base mb-4">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Enabled</th>
+                  <th>Limit</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (group of featuresForm.controls; track $index; let i = $index) {
+                  <tr [formGroup]="group">
+                    <td class="font-medium text-foreground">{{ featureKeys[i] }}</td>
+                    <td><input type="checkbox" class="toggle-input" formControlName="enabled"></td>
+                    <td>
+                      <input type="number" min="1" class="input !h-9 !w-28" formControlName="limit">
+                      @if (group.errors?.['limitRequired'] && group.touched) {
+                        <div><small class="text-destructive text-xs">Required when enabled</small></div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-primary" [disabled]="savingFeatures()" (click)="saveFeatures()">
+            @if (savingFeatures()) { Saving... } @else { Save Feature Access }
+          </button>
+        </section>
+      </div>
+    </div>
+  </div>
+}
+
+@if (activeTab() === 'admin') {
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h4 class="card-title">Admin Accounts</h4>
+        <p class="text-sm text-muted-foreground">Society admin users created during onboarding</p>
+      </div>
+    </div>
+    <div class="p-5 space-y-3">
+      @for (admin of admins(); track admin.id) {
+        <div class="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/20 hover:shadow-md">
+          <app-avatar [name]="admin.name" size="xl" />
+
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <h5 class="text-base font-semibold text-foreground">{{ admin.name }}</h5>
+              <span class="badge badge-soft-primary">Admin</span>
+            </div>
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span class="inline-flex min-w-0 items-center gap-1.5">
+                <app-icon name="mail" [size]="14" />
+                <span class="truncate">{{ admin.email }}</span>
+              </span>
+              @if (admin.phone) {
+                <span class="inline-flex items-center gap-1.5">
+                  <app-icon name="phone" [size]="14" />
+                  {{ admin.phone }}
+                </span>
+              }
+              <span class="text-xs text-muted-foreground/70">Admin since {{ admin.createdAt | date:'MMM d, y' }}</span>
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <p class="text-sm text-muted-foreground text-center py-6">No admin accounts found for this society.</p>
+      }
+    </div>
+  </div>
+}
+
+@if (activeTab() === 'payments') {
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h4 class="card-title">Payments</h4>
+      <p class="text-sm text-muted-foreground">Payment history for this society</p>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm" (click)="openAddPaymentModal()">+ Add Payment</button>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="table-base">
+      <thead>
+        <tr>
+          <th>Plan</th>
+          <th>Amount</th>
+          <th>Payment Date</th>
+          <th>Next Due Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (payment of payments(); track payment.id) {
+          <tr>
+            <td class="font-medium text-foreground">{{ payment.plan }}</td>
+            <td class="text-muted-foreground">{{ payment.amount }}</td>
+            <td class="text-muted-foreground">{{ payment.paymentDate || '—' }}</td>
+            <td class="text-muted-foreground">{{ payment.nextDueDate || '—' }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="4" class="text-center text-muted-foreground py-6">No payments recorded yet</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+}
+}
+
+@if (showAddPaymentModal()) {
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeAddPaymentModal()">
+    <div class="card w-full max-w-2xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+      <div class="card-header">
+        <div>
+          <h4 class="card-title">Add Payment</h4>
+          <p class="text-sm text-muted-foreground">Record a payment already received from this society</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeAddPaymentModal()" aria-label="Close modal" title="Close">
+          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+        </button>
+      </div>
+
+      <div class="p-5">
+        <form [formGroup]="paymentForm" (ngSubmit)="addPayment()" class="space-y-5">
+          <div class="form-layout">
+            <section class="form-section">
+              <div class="form-section-heading">Payment Details</div>
+              <div class="form-section-fields">
+                <div>
+                  <label class="label required" for="paymentPlan">Plan</label>
+                  <input id="paymentPlan" type="text" class="input" formControlName="plan" placeholder="e.g. Annual Premium">
+                </div>
+                <div>
+                  <label class="label required" for="paymentAmount">Amount</label>
+                  <input id="paymentAmount" type="number" class="input" formControlName="amount" placeholder="e.g. 25000">
+                </div>
+                <div>
+                  <label class="label required" for="paymentDate">Payment Date</label>
+                  <input id="paymentDate" type="date" class="input" formControlName="paymentDate">
+                </div>
+                <div>
+                  <label class="label required" for="paymentNextDueDate">Next Due Date</label>
+                  <input id="paymentNextDueDate" type="date" class="input" formControlName="nextDueDate">
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary" [disabled]="savingPayment() || paymentForm.invalid">
+              @if (savingPayment()) { Saving... } @else { Add Payment }
+            </button>
+            <button type="button" class="btn btn-soft-secondary" (click)="closeAddPaymentModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showAddRenewalModal()) {
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeAddRenewalModal()">
+    <div class="card w-full max-w-2xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+      <div class="card-header">
+        <div>
+          <h4 class="card-title">Renew Domain</h4>
+          <p class="text-sm text-muted-foreground">Record a domain purchase or renewal period</p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeAddRenewalModal()" aria-label="Close modal" title="Close">
+          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
+        </button>
+      </div>
+
+      <div class="p-5">
+        <form [formGroup]="renewalForm" (ngSubmit)="addRenewal()" class="space-y-5">
+          <div class="form-layout">
+            <section class="form-section">
+              <div class="form-section-heading">Renewal Details</div>
+              <div class="form-section-fields">
+                <div>
+                  <label class="label required" for="renewalStartDate">Renewed On</label>
+                  <input id="renewalStartDate" type="date" class="input" formControlName="startDate">
+                </div>
+                <div>
+                  <label class="label required" for="renewalExpiryDate">New Expiry Date</label>
+                  <input id="renewalExpiryDate" type="date" class="input" formControlName="expiryDate">
+                </div>
+                <div class="form-field-full">
+                  <label class="label" for="renewalNotes">Notes</label>
+                  <input id="renewalNotes" type="text" class="input" formControlName="notes" placeholder="e.g. Renewed via GoDaddy, 1 year plan">
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary" [disabled]="savingRenewal() || renewalForm.invalid">
+              @if (savingRenewal()) { Saving... } @else { Record Renewal }
+            </button>
+            <button type="button" class="btn btn-soft-secondary" (click)="closeAddRenewalModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+}

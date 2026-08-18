@@ -1,0 +1,113 @@
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <app-stat-card label="Members" [value]="memberCount()" icon="members" variant="primary" [loading]="loading()" />
+  <app-stat-card label="Notices" [value]="noticeCount()" icon="notices" variant="info" [loading]="loading()" />
+  <app-stat-card label="Documents" [value]="documentCount()" icon="documents" variant="success" [loading]="loading()" />
+  <app-stat-card label="Meetings" [value]="meetingCount()" icon="meetings" variant="warning" [loading]="loading()" />
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+  <div class="card p-5 min-w-0 overflow-hidden">
+    <h4 class="card-title mb-4">Content Overview</h4>
+    @if (loading()) {
+      <div class="skeleton h-[280px] w-full"></div>
+    } @else {
+      <apx-chart [series]="chartSeries" [chart]="chartOptions" [xaxis]="xaxis" [plotOptions]="plotOptions" [colors]="chartColors"></apx-chart>
+    }
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">Upcoming Meetings</h4>
+      <a routerLink="/admin/meetings" class="btn btn-sm h-8 px-2.5 gap-1 inline-flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary text-xs font-medium" aria-label="View all meetings">
+        View all
+        <app-icon name="chevron-right" [size]="14" />
+      </a>
+    </div>
+    <div class="divide-y divide-border">
+      @if (loading()) {
+        @for (i of [1,2,3]; track i) {
+          <div class="flex items-start gap-3 px-5 py-3">
+            <div class="skeleton h-9 w-9 rounded-xl flex-shrink-0"></div>
+            <div class="min-w-0 flex-1 space-y-2">
+              <div class="skeleton h-4 w-2/3"></div>
+              <div class="skeleton h-3 w-1/3"></div>
+            </div>
+          </div>
+        }
+      } @else {
+        @for (meeting of upcomingMeetings(); track meeting.id) {
+          <div class="flex items-start gap-3 px-5 py-3">
+            <div class="p-2 rounded-xl bg-primary/10 text-primary flex-shrink-0 ring-1 ring-primary/20">
+              <app-icon name="meetings" [size]="16" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-foreground">{{ meeting.title }}</p>
+              <div class="mt-1 flex items-center gap-2 flex-wrap">
+                <span class="text-xs text-muted-foreground">{{ meeting.meetingDate }}</span>
+                <span [class]="meetingStatusClass(meeting.status)">{{ meeting.status }}</span>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <div class="p-6 text-center text-sm text-muted-foreground">No meetings scheduled</div>
+        }
+      }
+    </div>
+  </div>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="card-header">
+    <h4 class="card-title">Recent Notices</h4>
+    <div class="flex items-center gap-2">
+      @if (noticeCategoryOptions().length > 0) {
+        <select class="input !h-8 !w-auto text-xs" [value]="noticeCategoryFilter()" (change)="setNoticeCategoryFilter($any($event.target).value)">
+          <option value="">All Categories</option>
+          @for (category of noticeCategoryOptions(); track category) {
+            <option [value]="category">{{ category }}</option>
+          }
+        </select>
+      }
+      <a routerLink="/admin/notices" class="btn btn-sm h-8 px-2.5 gap-1 inline-flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary text-xs font-medium" aria-label="View all notices">
+        View all
+        <app-icon name="chevron-right" [size]="14" />
+      </a>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="table-base">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Published On</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading()) {
+          @for (i of [1,2,3]; track i) {
+            <tr>
+              <td><div class="skeleton h-4 w-40"></div></td>
+              <td><div class="skeleton h-4 w-20"></div></td>
+              <td><div class="skeleton h-4 w-24"></div></td>
+            </tr>
+          }
+        } @else {
+          @for (notice of recentNotices(); track notice.id) {
+            <tr>
+              <td class="font-medium text-foreground">{{ notice.title }}</td>
+              <td>
+                <span [class]="noticeCategoryClass(notice.categoryName)">{{ notice.categoryName || 'General' }}</span>
+              </td>
+              <td class="text-muted-foreground">{{ notice.publishOn }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="3" class="text-center text-muted-foreground py-6">
+              {{ noticeCategoryFilter() ? 'No notices in this category' : 'No notices yet' }}
+            </td></tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

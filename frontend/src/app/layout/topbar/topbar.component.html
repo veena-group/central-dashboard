@@ -1,0 +1,61 @@
+<header class="fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-40 flex items-center">
+  <div class="w-[260px] h-full flex items-center gap-2 px-6 border-r border-border flex-shrink-0">
+    @if (mediaUrl.resolve(auth.currentUser()?.societyLogoUrl || null); as logoUrl) {
+      <app-secure-image [src]="logoUrl" alt="Society logo" cssClass="w-7 h-7 rounded-md object-cover" />
+    } @else {
+      <svg class="w-6 h-6 text-primary" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="-0.757324" y="19.2427" width="28" height="4" rx="2" transform="rotate(-45 -0.757324 19.2427)" fill="currentColor"/>
+        <rect x="7.72803" y="27.728" width="28" height="4" rx="2" transform="rotate(-45 7.72803 27.728)" fill="currentColor"/>
+        <rect x="10.5366" y="16.3945" width="16" height="4" rx="2" transform="rotate(45 10.5366 16.3945)" fill="currentColor"/>
+        <rect x="10.5562" y="-0.556152" width="28" height="4" rx="2" transform="rotate(45 10.5562 -0.556152)" fill="currentColor"/>
+      </svg>
+    }
+    <span class="font-semibold text-foreground truncate">{{ auth.currentUser()?.societyName || 'Veena Group' }}</span>
+  </div>
+
+  <div class="flex-1 flex items-center justify-between gap-3 px-4">
+    <div class="flex items-center gap-3">
+      <button type="button" class="btn btn-ghost btn-sm !px-2" (click)="layoutState.toggleSidebar()" aria-label="Toggle sidebar">
+        <app-icon name="menu" [size]="20" />
+      </button>
+
+      <div class="hidden sm:flex items-center h-9 w-64 rounded-md border border-input bg-background px-3 gap-2">
+        <app-icon name="search" [size]="16" class="text-muted-foreground flex-shrink-0" />
+        <input type="search" placeholder="Search members, notices..." class="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground">
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1 sm:gap-2">
+      <div class="relative" appClickOutside (clickOutside)="profileOpen.set(false)">
+        <button type="button" class="flex items-center gap-2 ml-1 rounded-full" (click)="toggleProfile()" aria-label="Profile menu">
+          <app-avatar [name]="auth.currentUser()?.name || 'User'" [imageUrl]="auth.currentUser()?.photoUrl || null" size="sm" />
+          <div class="hidden md:block text-left">
+            <p class="text-sm font-medium text-foreground leading-tight">{{ auth.currentUser()?.name || 'User' }}</p>
+            <p class="text-xs text-muted-foreground leading-tight">{{ auth.currentUser()?.role }}</p>
+          </div>
+        </button>
+
+        @if (profileOpen()) {
+          <div class="absolute right-0 top-12 w-64 bg-popover text-popover-foreground rounded-xl shadow-xl border border-border z-50 overflow-hidden">
+            <div class="p-4 border-b border-border">
+              <p class="text-sm font-medium text-foreground">{{ auth.currentUser()?.name }}</p>
+              <p class="text-xs text-muted-foreground">{{ auth.currentUser()?.email }}</p>
+            </div>
+            <div class="py-2">
+              <button type="button" (click)="goToProfile()" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-left">
+                <app-icon name="user" [size]="16" />
+                <span>Profile</span>
+              </button>
+            </div>
+            <div class="border-t border-border p-2">
+              <button type="button" (click)="logout()" aria-label="Log out" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 rounded-lg transition-colors text-left">
+                <app-icon name="logout" [size]="16" />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</header>

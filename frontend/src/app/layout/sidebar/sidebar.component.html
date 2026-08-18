@@ -1,0 +1,30 @@
+@if (layoutState.mobileSidebarOpen()) {
+  <div class="fixed inset-0 z-20 bg-black/40 lg:hidden" (click)="layoutState.closeMobileSidebar()" aria-hidden="true"></div>
+}
+
+<aside
+  [style.width]="layoutState.sidebarCollapsed() ? '72px' : '260px'"
+  [class.-translate-x-full]="!layoutState.mobileSidebarOpen()"
+  [class.translate-x-0]="layoutState.mobileSidebarOpen()"
+  class="fixed top-16 left-0 h-[calc(100vh-4rem)] bg-sidebar border-r border-sidebar-border overflow-y-auto transition-all duration-300 z-30 lg:translate-x-0">
+  <nav class="py-4">
+    @for (group of navGroups(); track group.title) {
+      <div class="px-6 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mt-4 first:mt-0 truncate">
+        {{ layoutState.sidebarCollapsed() ? '•••' : group.title }}
+      </div>
+      @for (item of group.items; track item.route) {
+        <a
+          [routerLink]="item.route"
+          routerLinkActive="bg-primary/10 text-primary font-medium"
+          [routerLinkActiveOptions]="{ exact: false }"
+          (click)="layoutState.closeMobileSidebar()"
+          class="flex items-center h-11 px-6 gap-3 text-sm font-medium text-foreground/80 hover:bg-accent transition-colors">
+          <app-icon [name]="item.icon" [size]="20" class="flex-shrink-0" />
+          @if (!layoutState.sidebarCollapsed()) {
+            <span class="truncate">{{ item.label }}</span>
+          }
+        </a>
+      }
+    }
+  </nav>
+</aside>

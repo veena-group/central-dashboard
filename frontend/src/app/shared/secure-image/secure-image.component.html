@@ -1,0 +1,11 @@
+@if (objectUrl(); as url) {
+  <img [src]="url" [alt]="alt()" [class]="cssClass()">
+} @else if (failed()) {
+  <div [class]="cssClass() + ' flex items-center justify-center bg-muted text-muted-foreground'">
+    <small class="text-xs">No image</small>
+  </div>
+} @else {
+  <div [class]="cssClass() + ' flex items-center justify-center bg-muted'">
+    <span class="w-4 h-4 rounded-full border-2 border-muted-foreground/40 border-t-muted-foreground animate-spin"></span>
+  </div>
+}

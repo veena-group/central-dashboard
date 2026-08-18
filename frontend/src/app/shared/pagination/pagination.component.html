@@ -1,0 +1,7 @@
+<div class="flex items-center justify-between px-5 py-3 border-t border-border">
+  <span class="text-sm text-muted-foreground">Page {{ page() + 1 }} of {{ totalPages() || 1 }}</span>
+  <div class="flex gap-2">
+    <button type="button" class="btn btn-outline btn-sm" [disabled]="first()" (click)="prev.emit()">Previous</button>
+    <button type="button" class="btn btn-outline btn-sm" [disabled]="last()" (click)="next.emit()">Next</button>
+  </div>
+</div>

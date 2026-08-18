@@ -1,0 +1,8 @@
+<app-topbar></app-topbar>
+<app-sidebar></app-sidebar>
+
+<main class="min-h-screen bg-background pt-16 content-offset transition-all duration-300" [style.margin-left]="contentMarginLeft()">
+  <div class="p-4 sm:p-6">
+    <router-outlet></router-outlet>
+  </div>
+</main>

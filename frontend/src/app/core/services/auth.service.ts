@@ -6,17 +6,21 @@ import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { CurrentUser, LoginRequest, LoginResponse } from '../models/auth.model';
 import { MyProfileResponse } from '../models/profile.model';
+import { MediaUrlService } from './media-url.service';
 
 const TOKEN_KEY = 'cd_token';
 const REFRESH_TOKEN_KEY = 'cd_refresh_token';
 const USER_KEY = 'cd_user';
+const DEFAULT_FAVICON = 'favicon.ico';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly mediaUrl = inject(MediaUrlService);
 
   private readonly currentUserSignal = signal<CurrentUser | null>(this.readUserFromStorage());
+  private faviconObjectUrl: string | null = null;
 
   readonly currentUser = this.currentUserSignal.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUserSignal() !== null);
@@ -131,6 +135,50 @@ export class AuthService {
     root.style.setProperty('--primary-foreground', this.getContrastColor(primary));
     root.style.setProperty('--secondary', secondary);
     root.style.setProperty('--secondary-foreground', this.getContrastColor(secondary));
+    this.applyFavicon(user);
+  }
+
+  /**
+   * Society logos are served via the authenticated /api/files/view endpoint (MediaUrlService),
+   * so a plain <link rel="icon" href="..."> can't load them directly - the browser won't attach
+   * the auth token to that request. Fetch it the same way SecureImageComponent does (blob via
+   * HttpClient) and point the favicon at the resulting object URL instead.
+   */
+  private applyFavicon(user: CurrentUser | null): void {
+    const resolvedUrl = this.mediaUrl.resolve(user?.societyLogoUrl);
+    if (!resolvedUrl) {
+      this.setFaviconHref(DEFAULT_FAVICON);
+      this.revokeFaviconObjectUrl();
+      return;
+    }
+    this.http.get(resolvedUrl, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const previous = this.faviconObjectUrl;
+        this.faviconObjectUrl = URL.createObjectURL(blob);
+        this.setFaviconHref(this.faviconObjectUrl);
+        if (previous) {
+          URL.revokeObjectURL(previous);
+        }
+      },
+      error: () => this.setFaviconHref(DEFAULT_FAVICON)
+    });
+  }
+
+  private setFaviconHref(href: string): void {
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = href;
+  }
+
+  private revokeFaviconObjectUrl(): void {
+    if (this.faviconObjectUrl) {
+      URL.revokeObjectURL(this.faviconObjectUrl);
+      this.faviconObjectUrl = null;
+    }
   }
 
   private normalizeColor(value: string | null | undefined): string | null {

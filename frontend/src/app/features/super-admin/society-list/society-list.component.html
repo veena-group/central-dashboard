@@ -235,7 +235,7 @@
                           <td class="font-medium text-foreground">{{ featureKeys[i] }}</td>
                           <td><input type="checkbox" class="toggle-input" formControlName="enabled" (change)="onFeatureToggle(i, $event)"></td>
                           <td>
-                            <input #limitInput type="number" min="1" class="input !h-9 !w-32" formControlName="limit" placeholder="e.g. 200">
+                            <input #limitInput type="number" class="input !h-9 !w-32" formControlName="limit" placeholder="e.g. 200">
                             @if (control.errors?.['limitRequired'] && control.touched) {
                               <div><small class="text-destructive text-xs">Required when enabled</small></div>
                             }

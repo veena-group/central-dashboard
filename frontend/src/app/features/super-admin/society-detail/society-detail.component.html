@@ -261,7 +261,7 @@
                     <td class="font-medium text-foreground">{{ featureKeys[i] }}</td>
                     <td><input type="checkbox" class="toggle-input" formControlName="enabled"></td>
                     <td>
-                      <input type="number" min="1" class="input !h-9 !w-28" formControlName="limit">
+                      <input type="number" class="input !h-9 !w-28" formControlName="limit">
                       @if (group.errors?.['limitRequired'] && group.touched) {
                         <div><small class="text-destructive text-xs">Required when enabled</small></div>
                       }

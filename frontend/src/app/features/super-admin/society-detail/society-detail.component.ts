@@ -301,13 +301,6 @@ export class SocietyDetailComponent {
 
   saveFeatures(): void {
     if (this.featuresForm.invalid) {
-      // TEMP DEBUG: remove once VPS "Set a valid limit" mismatch is diagnosed.
-      console.log('featuresForm debug', this.featureKeys.map((key, i) => ({
-        key,
-        value: this.featuresForm.at(i).getRawValue(),
-        status: this.featuresForm.at(i).status,
-        errors: this.featuresForm.at(i).errors
-      })));
       this.featuresForm.markAllAsTouched();
       this.toast.error('Set a valid limit (1 or more) for every enabled feature before saving.');
       return;

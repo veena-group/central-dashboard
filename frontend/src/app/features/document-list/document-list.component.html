@@ -83,9 +83,11 @@
         <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
           @if (doc.attachments.length) {
             @for (attachment of doc.attachments; track attachment.id) {
-              <button type="button" class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors" (click)="openAttachmentList(doc)" [title]="attachment.fileName">
-                <app-icon name="documents" [size]="12" />
-                <span class="max-w-[160px] truncate">{{ attachment.fileName }}</span>
+              <button type="button" class="group flex w-20 flex-col items-center gap-1 rounded-lg border border-border bg-muted/20 p-2 transition-colors hover:border-primary hover:bg-primary/5" [disabled]="attachmentActionInProgress()" (click)="openAttachment(doc, attachment)" [title]="attachment.fileName">
+                <span class="flex h-10 w-10 items-center justify-center rounded-md bg-white text-muted-foreground shadow-sm ring-1 ring-border group-hover:text-primary">
+                  <app-icon name="documents" [size]="20" />
+                </span>
+                <span class="w-full truncate text-center text-[11px] font-medium text-muted-foreground group-hover:text-primary">{{ attachment.fileName }}</span>
               </button>
             }
           } @else {
@@ -282,65 +284,6 @@
   (cancelAction)="closeDeleteDocumentConfirm()"
   (confirmAction)="confirmDeleteDocument()"></app-confirm-modal>
 
-@if (attachmentListTarget(); as target) {
-  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeAttachmentList()">
-    <div class="card w-full max-w-2xl max-h-[85vh] overflow-auto" (click)="$event.stopPropagation()">
-      <div class="card-header">
-        <div>
-          <h4 class="card-title">Document Details</h4>
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="closeAttachmentList()" aria-label="Close modal" title="Close">
-          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
-        </button>
-      </div>
-
-      <div class="p-5 space-y-4">
-        <div>
-          <div class="flex flex-wrap items-center gap-2">
-            <h5 class="text-base font-semibold text-foreground">{{ target.title }}</h5>
-            <span [class]="categoryBadgeClass(target.categoryName)">{{ target.categoryName || 'General' }}</span>
-            <span [class]="target.isPublic ? 'badge badge-soft-success' : 'badge badge-soft-secondary'">
-              {{ target.isPublic ? 'Public' : 'Members only' }}
-            </span>
-          </div>
-          @if (target.description) {
-            <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{{ target.description }}</p>
-          }
-          @if (target.year) {
-            <p class="mt-3 text-xs text-muted-foreground/70">Year {{ target.year }}</p>
-          }
-        </div>
-
-        <div class="border-t border-border/60 pt-4">
-          <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attachments</p>
-          <div class="space-y-3">
-            @if (target.attachments.length) {
-              @for (attachment of target.attachments; track attachment.id) {
-                <div class="upload-file-row">
-                  <p class="text-sm text-foreground font-medium">{{ attachment.fileName }}</p>
-                  <div class="flex items-center gap-2">
-                    <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-view" [disabled]="attachmentActionInProgress()" (click)="openAttachment(attachment)" aria-label="View attachment" title="View">
-                      <app-icon name="eye" [size]="14" />
-                    </button>
-                    @if (target.downloadable) {
-                      <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-download" [disabled]="attachmentActionInProgress()" (click)="downloadAttachment(attachment)" aria-label="Download attachment" title="Download">
-                        <app-icon name="download" [size]="14" />
-                      </button>
-                    }
-                  </div>
-                </div>
-              }
-            } @else {
-              <p class="text-sm text-muted-foreground">No attachments available.</p>
-            }
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-}
-
 <app-attachment-preview
   [open]="previewOpen()"
   [loading]="previewLoading()"
@@ -348,6 +291,7 @@
   [fileName]="previewAttachmentName()"
   [blob]="previewBlob()"
   [downloadable]="previewDownloadable()"
+  (download)="downloadPreviewedAttachment()"
   (closed)="closePreviewModal()" />
 
 @if (showEditModal()) {

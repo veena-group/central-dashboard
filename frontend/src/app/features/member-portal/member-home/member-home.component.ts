@@ -1,10 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 import { NgApexchartsModule, ApexAxisChartSeries, ApexChart, ApexXAxis, ApexPlotOptions } from 'ng-apexcharts';
 import { MemberApiService } from '../../../core/services/member-api.service';
 import { StatCardComponent } from '../../../shared/stat-card/stat-card.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { FeatureAccessService, FeatureKey } from '../../../core/services/feature-access.service';
 
 interface NoticeRow {
   id: number;
@@ -27,6 +28,12 @@ interface MeetingRow {
 })
 export class MemberHomeComponent {
   private readonly api = inject(MemberApiService);
+  private readonly featureAccess = inject(FeatureAccessService);
+
+  readonly showNotices = computed(() => this.featureAccess.isEnabled('NOTICES'));
+  readonly showDocuments = computed(() => this.featureAccess.isEnabled('DOCUMENTS'));
+  readonly showForms = computed(() => this.featureAccess.isEnabled('FORMS'));
+  readonly showMeetings = computed(() => this.featureAccess.isEnabled('MEETINGS'));
 
   readonly loading = signal(true);
   readonly noticeCount = signal(0);
@@ -54,11 +61,13 @@ export class MemberHomeComponent {
   readonly xaxis: ApexXAxis = { categories: this.chartLabels };
 
   constructor() {
+    const isEnabled = (key: FeatureKey) => this.featureAccess.isEnabled(key);
+
     forkJoin({
-      notices: this.api.list<NoticeRow>('/notices'),
-      documents: this.api.list<unknown>('/documents'),
-      forms: this.api.list<unknown>('/forms'),
-      meetings: this.api.list<MeetingRow>('/meetings')
+      notices: isEnabled('NOTICES') ? this.api.list<NoticeRow>('/notices') : of([] as NoticeRow[]),
+      documents: isEnabled('DOCUMENTS') ? this.api.list<unknown>('/documents') : of([]),
+      forms: isEnabled('FORMS') ? this.api.list<unknown>('/forms') : of([]),
+      meetings: isEnabled('MEETINGS') ? this.api.list<MeetingRow>('/meetings') : of([] as MeetingRow[])
     }).subscribe({
       next: ({ notices, documents, forms, meetings }) => {
         this.noticeCount.set(notices.length);

@@ -58,7 +58,6 @@ export class DocumentListComponent {
   readonly editAttachments = signal<AttachmentResponse[]>([]);
   readonly editAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
   readonly attachmentActionInProgress = signal(false);
-  readonly attachmentListTarget = signal<DocumentRow | null>(null);
   readonly pendingAttachmentRemovalIds = signal<ReadonlySet<number>>(new Set());
   readonly expandedDescriptionIds = signal<ReadonlySet<number>>(new Set());
   readonly previewOpen = signal(false);
@@ -66,6 +65,8 @@ export class DocumentListComponent {
   readonly previewError = signal<string | null>(null);
   readonly previewAttachmentName = signal('');
   readonly previewBlob = signal<Blob | null>(null);
+  readonly previewDownloadable = signal(true);
+  readonly previewAttachment = signal<AttachmentResponse | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<DocumentRow[]>([]);
   readonly page = signal(0);
@@ -267,17 +268,6 @@ export class DocumentListComponent {
     this.loadCategories();
   }
 
-  openAttachmentList(document: DocumentRow): void {
-    this.attachmentListTarget.set(document);
-  }
-
-  closeAttachmentList(): void {
-    if (this.attachmentActionInProgress()) {
-      return;
-    }
-    this.attachmentListTarget.set(null);
-  }
-
   closeEditModal(): void {
     this.showEditModal.set(false);
     this.updating.set(false);
@@ -462,12 +452,14 @@ export class DocumentListComponent {
     this.editAttachmentFiles.set(files);
   }
 
-  openAttachment(attachment: AttachmentResponse): void {
+  openAttachment(document: DocumentRow, attachment: AttachmentResponse): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
+    this.previewDownloadable.set(document.downloadable);
+    this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
     this.adminApi.fetchStoredFile(attachment.filePath).subscribe({
       next: (blob) => {
@@ -483,8 +475,11 @@ export class DocumentListComponent {
     });
   }
 
-  previewDownloadable(): boolean {
-    return this.attachmentListTarget()?.downloadable ?? this.editForm.controls.downloadable.value;
+  downloadPreviewedAttachment(): void {
+    const attachment = this.previewAttachment();
+    if (attachment) {
+      this.downloadAttachment(attachment);
+    }
   }
 
   closePreviewModal(): void {
@@ -493,6 +488,7 @@ export class DocumentListComponent {
     this.previewError.set(null);
     this.previewAttachmentName.set('');
     this.previewBlob.set(null);
+    this.previewAttachment.set(null);
   }
 
   downloadAttachment(attachment: AttachmentResponse): void {

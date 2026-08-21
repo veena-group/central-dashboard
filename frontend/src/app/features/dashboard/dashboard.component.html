@@ -1,8 +1,16 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-  <app-stat-card label="Members" [value]="memberCount()" icon="members" variant="primary" [loading]="loading()" />
-  <app-stat-card label="Notices" [value]="noticeCount()" icon="notices" variant="info" [loading]="loading()" />
-  <app-stat-card label="Documents" [value]="documentCount()" icon="documents" variant="success" [loading]="loading()" />
-  <app-stat-card label="Meetings" [value]="meetingCount()" icon="meetings" variant="warning" [loading]="loading()" />
+  @if (showMembers()) {
+    <app-stat-card label="Members" [value]="memberCount()" icon="members" variant="primary" [loading]="loading()" />
+  }
+  @if (showNotices()) {
+    <app-stat-card label="Notices" [value]="noticeCount()" icon="notices" variant="info" [loading]="loading()" />
+  }
+  @if (showDocuments()) {
+    <app-stat-card label="Documents" [value]="documentCount()" icon="documents" variant="success" [loading]="loading()" />
+  }
+  @if (showMeetings()) {
+    <app-stat-card label="Meetings" [value]="meetingCount()" icon="meetings" variant="warning" [loading]="loading()" />
+  }
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

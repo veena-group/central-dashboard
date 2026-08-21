@@ -1,12 +1,26 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 import { NgApexchartsModule, ApexAxisChartSeries, ApexChart, ApexXAxis, ApexPlotOptions } from 'ng-apexcharts';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../../core/models/api-response.model';
 import { StatCardComponent } from '../../shared/stat-card/stat-card.component';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { FeatureAccessService, FeatureKey } from '../../core/services/feature-access.service';
+
+function emptyPage<T>(): ApiResponse<PageResponse<T>> {
+  return {
+    success: true,
+    message: '',
+    timestamp: '',
+    data: { content: [], page: 0, size: 0, totalElements: 0, totalPages: 0, first: true, last: true }
+  };
+}
+
+function emptyList<T>(): ApiResponse<T[]> {
+  return { success: true, message: '', timestamp: '', data: [] };
+}
 
 interface NoticeRow {
   id: number;
@@ -31,6 +45,12 @@ type MeetingStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'ONGOING';
 })
 export class DashboardComponent {
   private readonly http = inject(HttpClient);
+  private readonly featureAccess = inject(FeatureAccessService);
+
+  readonly showMembers = computed(() => this.featureAccess.isEnabled('MEMBERS'));
+  readonly showNotices = computed(() => this.featureAccess.isEnabled('NOTICES'));
+  readonly showDocuments = computed(() => this.featureAccess.isEnabled('DOCUMENTS'));
+  readonly showMeetings = computed(() => this.featureAccess.isEnabled('MEETINGS'));
 
   readonly loading = signal(true);
   readonly memberCount = signal(0);
@@ -60,15 +80,22 @@ export class DashboardComponent {
 
   constructor() {
     const base = environment.apiBaseUrl;
+    const isEnabled = (key: FeatureKey) => this.featureAccess.isEnabled(key);
+    const pageIfEnabled = (key: FeatureKey, url: string) =>
+      isEnabled(key) ? this.http.get<ApiResponse<PageResponse<unknown>>>(url) : of(emptyPage<unknown>());
 
     forkJoin({
-      members: this.http.get<ApiResponse<PageResponse<unknown>>>(`${base}/admin/members?page=0&size=1`),
-      notices: this.http.get<ApiResponse<PageResponse<unknown>>>(`${base}/admin/notices?page=0&size=1`),
-      recentNotices: this.http.get<ApiResponse<NoticeRow[]>>(`${base}/admin/notices/recent?limit=20`),
-      documents: this.http.get<ApiResponse<PageResponse<unknown>>>(`${base}/admin/documents?page=0&size=1`),
-      meetings: this.http.get<ApiResponse<PageResponse<unknown>>>(`${base}/admin/meetings?page=0&size=1`),
-      upcomingMeetings: this.http.get<ApiResponse<MeetingRow[]>>(`${base}/admin/meetings/upcoming?limit=5`),
-      events: this.http.get<ApiResponse<PageResponse<unknown>>>(`${base}/admin/events?page=0&size=1`)
+      members: pageIfEnabled('MEMBERS', `${base}/admin/members?page=0&size=1`),
+      notices: pageIfEnabled('NOTICES', `${base}/admin/notices?page=0&size=1`),
+      recentNotices: isEnabled('NOTICES')
+        ? this.http.get<ApiResponse<NoticeRow[]>>(`${base}/admin/notices/recent?limit=20`)
+        : of(emptyList<NoticeRow>()),
+      documents: pageIfEnabled('DOCUMENTS', `${base}/admin/documents?page=0&size=1`),
+      meetings: pageIfEnabled('MEETINGS', `${base}/admin/meetings?page=0&size=1`),
+      upcomingMeetings: isEnabled('MEETINGS')
+        ? this.http.get<ApiResponse<MeetingRow[]>>(`${base}/admin/meetings/upcoming?limit=5`)
+        : of(emptyList<MeetingRow>()),
+      events: pageIfEnabled('EVENTS', `${base}/admin/events?page=0&size=1`)
     }).subscribe({
       next: ({ members, notices, recentNotices, documents, meetings, upcomingMeetings, events }) => {
         this.memberCount.set(members.data.totalElements);

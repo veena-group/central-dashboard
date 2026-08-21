@@ -30,6 +30,7 @@ export class AttachmentPreviewComponent {
   readonly blob = input<Blob | null>(null);
   readonly downloadable = input(true);
   readonly closed = output<void>();
+  readonly download = output<void>();
 
   readonly mode = signal<PreviewMode>(null);
   readonly objectUrl = signal<string | null>(null);

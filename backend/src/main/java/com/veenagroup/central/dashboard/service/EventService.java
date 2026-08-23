@@ -174,7 +174,7 @@ public class EventService {
     @Transactional
     public EventResponse addAttachment(Long societyId, Long eventId, MultipartFile file) {
         Event event = findOwned(societyId, eventId);
-        String path = fileStorageService.storePdfOnly(file, societyId, "events");
+        String path = fileStorageService.storeAttachment(file, societyId, "events");
 
         EventAttachment attachment = EventAttachment.builder()
                 .event(event)

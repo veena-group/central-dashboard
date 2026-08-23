@@ -12,7 +12,8 @@ import { MediaUrlService } from '../../core/services/media-url.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { SecureImageComponent } from '../../shared/secure-image/secure-image.component';
 import { AttachmentPreviewComponent } from '../../shared/attachment-preview/attachment-preview.component';
-import { validatePdfFile } from '../../core/utils/pdf-file-validator';
+import { AttachmentCardComponent } from '../../shared/attachment-card/attachment-card.component';
+import { validateAttachmentFile } from '../../core/utils/attachment-file-validator';
 
 interface EventRow {
   id: number;
@@ -42,7 +43,7 @@ interface SelectedAttachmentFile {
 
 @Component({
   selector: 'app-event-list',
-  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, SecureImageComponent, DatePipe, AttachmentPreviewComponent],
+  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, SecureImageComponent, DatePipe, AttachmentPreviewComponent, AttachmentCardComponent],
   templateUrl: './event-list.component.html'
 })
 export class EventListComponent {
@@ -60,24 +61,25 @@ export class EventListComponent {
   readonly deletingEventId = signal<number | null>(null);
   readonly eventPendingDelete = signal<EventRow | null>(null);
   readonly categoriesLoading = signal(false);
-  readonly createError = signal<string | null>(null);
-  readonly editError = signal<string | null>(null);
   readonly createBannerFile = signal<File | null>(null);
   readonly createBannerPreviewUrl = signal<string | null>(null);
   readonly editBannerFile = signal<File | null>(null);
   readonly editBannerPreviewUrl = signal<string | null>(null);
   readonly createAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly createAttachmentErrors = signal<string[]>([]);
   readonly createAttachmentDragActive = signal(false);
   readonly editAttachments = signal<AttachmentResponse[]>([]);
   readonly editAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly editAttachmentErrors = signal<string[]>([]);
   readonly attachmentActionInProgress = signal(false);
-  readonly attachmentListTarget = signal<EventRow | null>(null);
   readonly pendingAttachmentRemovalIds = signal<ReadonlySet<number>>(new Set());
   readonly previewOpen = signal(false);
   readonly previewLoading = signal(false);
   readonly previewError = signal<string | null>(null);
   readonly previewAttachmentName = signal('');
   readonly previewBlob = signal<Blob | null>(null);
+  readonly previewDownloadable = signal(true);
+  readonly previewAttachment = signal<AttachmentResponse | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<EventRow[]>([]);
   readonly page = signal(0);
@@ -129,7 +131,7 @@ export class EventListComponent {
 
   load(page: number): void {
     this.loading.set(true);
-    this.api.list<EventRow>('/admin/events', page, 5, {
+    this.api.list<EventRow>('/admin/events', page, 6, {
       search: this.searchControl.value.trim() || undefined,
       categoryId: this.categoryFilter() || undefined,
       status: this.statusFilter() || undefined
@@ -191,15 +193,14 @@ export class EventListComponent {
 
   openCreateModal(): void {
     this.showCreateModal.set(true);
-    this.createError.set(null);
     this.loadCategories();
   }
 
   closeCreateModal(): void {
     this.showCreateModal.set(false);
     this.creating.set(false);
-    this.createError.set(null);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
     this.createAttachmentDragActive.set(false);
     this.clearCreateBanner();
     this.createForm.reset({
@@ -267,7 +268,6 @@ export class EventListComponent {
 
     const value = this.createForm.getRawValue();
     this.creating.set(true);
-    this.createError.set(null);
 
     this.adminApi.createEvent({
       title: value.title,
@@ -301,7 +301,6 @@ export class EventListComponent {
             error: (err: HttpErrorResponse) => {
               this.creating.set(false);
               const message = err.error?.message || 'Event created, but banner/attachment upload failed.';
-              this.createError.set(message);
               this.toast.error(message);
               this.closeCreateModal();
               this.load(0);
@@ -318,7 +317,6 @@ export class EventListComponent {
       error: (err: HttpErrorResponse) => {
         this.creating.set(false);
         const message = err.error?.message || 'Unable to create event. Please try again.';
-        this.createError.set(message);
         this.toast.error(message);
       }
     });
@@ -326,7 +324,6 @@ export class EventListComponent {
 
   openEditModal(item: EventRow): void {
     this.editingEventId.set(item.id);
-    this.editError.set(null);
     this.editForm.reset({
       title: item.title,
       categoryId: item.categoryId,
@@ -342,30 +339,20 @@ export class EventListComponent {
     });
     this.editAttachments.set(item.attachments ?? []);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.clearEditBanner();
     this.showEditModal.set(true);
     this.loadCategories();
   }
 
-  openAttachmentList(item: EventRow): void {
-    this.attachmentListTarget.set(item);
-  }
-
-  closeAttachmentList(): void {
-    if (this.attachmentActionInProgress()) {
-      return;
-    }
-    this.attachmentListTarget.set(null);
-  }
-
   closeEditModal(): void {
     this.showEditModal.set(false);
     this.updating.set(false);
     this.editingEventId.set(null);
-    this.editError.set(null);
     this.editAttachments.set([]);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.attachmentActionInProgress.set(false);
     this.clearEditBanner();
@@ -397,7 +384,6 @@ export class EventListComponent {
 
     const value = this.editForm.getRawValue();
     this.updating.set(true);
-    this.editError.set(null);
 
     this.adminApi.updateEvent(eventId, {
       title: value.title,
@@ -433,7 +419,6 @@ export class EventListComponent {
             error: (err: HttpErrorResponse) => {
               this.updating.set(false);
               const message = err.error?.message || 'Event updated, but some changes failed.';
-              this.editError.set(message);
               this.toast.error(message);
               this.load(this.page());
             }
@@ -449,7 +434,6 @@ export class EventListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update event. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -521,6 +505,7 @@ export class EventListComponent {
   clearCreateAttachmentSelection(): void {
     this.createAttachmentDragActive.set(false);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
   }
 
   removeCreateAttachment(index: number): void {
@@ -538,6 +523,7 @@ export class EventListComponent {
 
   clearEditAttachmentSelection(): void {
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
   }
 
   removeEditAttachment(index: number): void {
@@ -546,12 +532,14 @@ export class EventListComponent {
     this.editAttachmentFiles.set(files);
   }
 
-  openAttachment(attachment: AttachmentResponse): void {
+  openAttachment(item: EventRow, attachment: AttachmentResponse): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
+    this.previewDownloadable.set(item.downloadable);
+    this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
     this.adminApi.fetchStoredFile(attachment.filePath).subscribe({
       next: (blob) => {
@@ -567,8 +555,11 @@ export class EventListComponent {
     });
   }
 
-  previewDownloadable(): boolean {
-    return this.attachmentListTarget()?.downloadable ?? this.editForm.controls.downloadable.value;
+  downloadPreviewedAttachment(): void {
+    const attachment = this.previewAttachment();
+    if (attachment) {
+      this.downloadAttachment(attachment);
+    }
   }
 
   closePreviewModal(): void {
@@ -624,11 +615,12 @@ export class EventListComponent {
     const existing = this.createAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -645,6 +637,7 @@ export class EventListComponent {
       });
     }
 
+    this.createAttachmentErrors.set(errors);
     this.createAttachmentFiles.set(next);
   }
 
@@ -656,11 +649,12 @@ export class EventListComponent {
     const existing = this.editAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -677,6 +671,7 @@ export class EventListComponent {
       });
     }
 
+    this.editAttachmentErrors.set(errors);
     this.editAttachmentFiles.set(next);
   }
 

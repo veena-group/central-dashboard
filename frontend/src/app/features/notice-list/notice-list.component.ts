@@ -10,7 +10,8 @@ import { AdminContentApiService, AttachmentResponse, CategoryOption } from '../.
 import { NotificationService } from '../../core/services/notification.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { AttachmentPreviewComponent } from '../../shared/attachment-preview/attachment-preview.component';
-import { validatePdfFile } from '../../core/utils/pdf-file-validator';
+import { AttachmentCardComponent } from '../../shared/attachment-card/attachment-card.component';
+import { validateAttachmentFile } from '../../core/utils/attachment-file-validator';
 
 interface NoticeRow {
   id: number;
@@ -35,7 +36,7 @@ interface SelectedAttachmentFile {
 
 @Component({
   selector: 'app-notice-list',
-  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent],
+  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent, AttachmentCardComponent],
   templateUrl: './notice-list.component.html'
 })
 export class NoticeListComponent {
@@ -53,13 +54,13 @@ export class NoticeListComponent {
   readonly noticePendingDelete = signal<NoticeRow | null>(null);
   readonly categoriesLoading = signal(false);
   readonly createError = signal<string | null>(null);
-  readonly editError = signal<string | null>(null);
   readonly createAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly createAttachmentErrors = signal<string[]>([]);
   readonly createAttachmentDragActive = signal(false);
   readonly editAttachments = signal<AttachmentResponse[]>([]);
   readonly editAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly editAttachmentErrors = signal<string[]>([]);
   readonly attachmentActionInProgress = signal(false);
-  readonly attachmentListTarget = signal<NoticeRow | null>(null);
   readonly pendingAttachmentRemovalIds = signal<ReadonlySet<number>>(new Set());
   readonly expandedDescriptionIds = signal<ReadonlySet<number>>(new Set());
   readonly previewOpen = signal(false);
@@ -67,6 +68,8 @@ export class NoticeListComponent {
   readonly previewError = signal<string | null>(null);
   readonly previewAttachmentName = signal('');
   readonly previewBlob = signal<Blob | null>(null);
+  readonly previewDownloadable = signal(true);
+  readonly previewAttachment = signal<AttachmentResponse | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<NoticeRow[]>([]);
   readonly page = signal(0);
@@ -113,7 +116,7 @@ export class NoticeListComponent {
 
   load(page: number): void {
     this.loading.set(true);
-    this.api.list<NoticeRow>('/admin/notices', page, 5, {
+    this.api.list<NoticeRow>('/admin/notices', page, 6, {
       search: this.searchControl.value.trim() || undefined,
       categoryId: this.categoryFilter() || undefined,
       isPublic: this.visibilityFilter() === '' ? undefined : this.visibilityFilter() === 'true'
@@ -162,6 +165,7 @@ export class NoticeListComponent {
     this.creating.set(false);
     this.createError.set(null);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
     this.createAttachmentDragActive.set(false);
     this.createForm.reset({
       title: '',
@@ -231,7 +235,6 @@ export class NoticeListComponent {
 
   openEditModal(notice: NoticeRow): void {
     this.editingNoticeId.set(notice.id);
-    this.editError.set(null);
     this.editForm.reset({
       title: notice.title,
       body: notice.body ?? '',
@@ -243,29 +246,19 @@ export class NoticeListComponent {
     });
     this.editAttachments.set(notice.attachments ?? []);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.showEditModal.set(true);
     this.loadNoticeCategories();
-  }
-
-  openAttachmentList(notice: NoticeRow): void {
-    this.attachmentListTarget.set(notice);
-  }
-
-  closeAttachmentList(): void {
-    if (this.attachmentActionInProgress()) {
-      return;
-    }
-    this.attachmentListTarget.set(null);
   }
 
   closeEditModal(): void {
     this.showEditModal.set(false);
     this.updating.set(false);
     this.editingNoticeId.set(null);
-    this.editError.set(null);
     this.editAttachments.set([]);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.attachmentActionInProgress.set(false);
     this.editForm.reset({
@@ -292,7 +285,6 @@ export class NoticeListComponent {
 
     const value = this.editForm.getRawValue();
     this.updating.set(true);
-    this.editError.set(null);
 
     this.adminApi.updateNotice(noticeId, {
       title: value.title,
@@ -322,7 +314,6 @@ export class NoticeListComponent {
             error: (err: HttpErrorResponse) => {
               this.updating.set(false);
               const message = err.error?.message || 'Notice updated, but some attachment changes failed.';
-              this.editError.set(message);
               this.toast.error(message);
               this.load(this.page());
             }
@@ -338,7 +329,6 @@ export class NoticeListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update notice. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -411,6 +401,7 @@ export class NoticeListComponent {
   clearCreateAttachmentSelection(): void {
     this.createAttachmentDragActive.set(false);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
   }
 
   removeCreateAttachment(index: number): void {
@@ -428,6 +419,7 @@ export class NoticeListComponent {
 
   clearEditAttachmentSelection(): void {
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
   }
 
   removeEditAttachment(index: number): void {
@@ -436,12 +428,14 @@ export class NoticeListComponent {
     this.editAttachmentFiles.set(files);
   }
 
-  openAttachment(attachment: AttachmentResponse): void {
+  openAttachment(notice: NoticeRow, attachment: AttachmentResponse): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
+    this.previewDownloadable.set(notice.downloadable);
+    this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
     this.adminApi.fetchStoredFile(attachment.filePath).subscribe({
       next: (blob) => {
@@ -457,8 +451,11 @@ export class NoticeListComponent {
     });
   }
 
-  previewDownloadable(): boolean {
-    return this.attachmentListTarget()?.downloadable ?? this.editForm.controls.downloadable.value;
+  downloadPreviewedAttachment(): void {
+    const attachment = this.previewAttachment();
+    if (attachment) {
+      this.downloadAttachment(attachment);
+    }
   }
 
   closePreviewModal(): void {
@@ -514,11 +511,12 @@ export class NoticeListComponent {
     const existing = this.createAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -535,6 +533,7 @@ export class NoticeListComponent {
       });
     }
 
+    this.createAttachmentErrors.set(errors);
     this.createAttachmentFiles.set(next);
   }
 
@@ -546,11 +545,12 @@ export class NoticeListComponent {
     const existing = this.editAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -567,6 +567,7 @@ export class NoticeListComponent {
       });
     }
 
+    this.editAttachmentErrors.set(errors);
     this.editAttachmentFiles.set(next);
   }
 

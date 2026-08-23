@@ -20,9 +20,6 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
@@ -38,25 +35,23 @@ public class FileStorageService {
             "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv"
     );
 
-    private static final Set<String> PDF_ONLY_EXTENSIONS = Set.of("pdf");
+    /**
+     * Extensions accepted for notice/document/form/meeting/event attachments: PDF, images, and the
+     * modern (XML-based) Office formats. Legacy binary .doc/.xls are deliberately excluded - the
+     * frontend preview renders these client-side via mammoth.js/SheetJS, which don't reliably parse
+     * the old binary formats, so we reject them at upload rather than let them upload successfully
+     * and then fail to preview.
+     */
+    private static final Set<String> ATTACHMENT_EXTENSIONS = Set.of(
+            "jpg", "jpeg", "png", "gif", "webp", "pdf", "docx", "xlsx"
+    );
 
     private final Path basePath;
     private final SocietyRepository societyRepository;
-    private final long maxBytesPerSociety;
-
-    /**
-     * Serializes the "measure current usage, then write" critical section per society, so two
-     * concurrent uploads to the same society can't both pass the quota check before either file is
-     * actually written (a filesystem check-then-act race that DB transactions can't cover). Uploads
-     * to different societies never block each other since each gets its own lock instance.
-     */
-    private final ConcurrentHashMap<Long, Lock> societyUploadLocks = new ConcurrentHashMap<>();
 
     public FileStorageService(@Value("${app.storage.base-path}") String basePath,
-                               @Value("${app.storage.max-bytes-per-society}") long maxBytesPerSociety,
                                SocietyRepository societyRepository) {
         this.basePath = Path.of(basePath).toAbsolutePath().normalize();
-        this.maxBytesPerSociety = maxBytesPerSociety;
         this.societyRepository = societyRepository;
         try {
             Files.createDirectories(this.basePath);
@@ -75,12 +70,12 @@ public class FileStorageService {
     }
 
     /**
-     * Restricts the upload to PDF only. Used for notice/form/meeting/event attachments, which
-     * (unlike the general Documents repository) are meant to hold a single printable/shareable
-     * PDF rather than arbitrary office file types.
+     * Used for notice/document/form/meeting/event attachments: accepts PDF, images, and modern Word
+     * (.docx)/Excel (.xlsx) files - everything the in-browser preview can render.
      */
-    public String storePdfOnly(MultipartFile file, Long societyId, String subfolder) {
-        return store(file, societyId, subfolder, PDF_ONLY_EXTENSIONS, "Only PDF files are allowed for this attachment.");
+    public String storeAttachment(MultipartFile file, Long societyId, String subfolder) {
+        return store(file, societyId, subfolder, ATTACHMENT_EXTENSIONS,
+                "This file type is not allowed. Supported types: PDF, Word (.docx), Excel (.xlsx), and image files.");
     }
 
     private String store(MultipartFile file, Long societyId, String subfolder, Set<String> allowedExtensions, String unsupportedTypeMessage) {
@@ -102,46 +97,16 @@ public class FileStorageService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_FILE_PATH", "Invalid file path");
         }
 
-        Lock lock = societyUploadLocks.computeIfAbsent(societyId, id -> new ReentrantLock());
-        lock.lock();
         try {
-            if (currentUsageBytes(societyId) + file.getSize() > maxBytesPerSociety) {
-                throw new BusinessException(HttpStatus.PAYLOAD_TOO_LARGE, "STORAGE_QUOTA_EXCEEDED",
-                        "Your society has reached its storage limit. Please remove unused files or contact support to increase it.");
-            }
-
-            try {
-                Files.createDirectories(targetPath.getParent());
-                file.transferTo(targetPath);
-            } catch (IOException e) {
-                log.error("Failed to store file for society {} in subfolder {}: {}", societyId, subfolder, e.getMessage(), e);
-                throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_STORAGE_FAILED", "Failed to store file");
-            }
-        } finally {
-            lock.unlock();
+            Files.createDirectories(targetPath.getParent());
+            file.transferTo(targetPath);
+        } catch (IOException e) {
+            log.error("Failed to store file for society {} in subfolder {}: {}", societyId, subfolder, e.getMessage(), e);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_STORAGE_FAILED", "Failed to store file");
         }
 
         log.info("Stored file for society {} at {}", societyId, relativePath);
         return relativePath;
-    }
-
-    private long currentUsageBytes(Long societyId) {
-        Path societyDir = basePath.resolve(societyFolder(societyId)).normalize();
-        if (!societyDir.startsWith(basePath) || !Files.isDirectory(societyDir)) {
-            return 0L;
-        }
-        try (var stream = Files.walk(societyDir)) {
-            return stream.filter(Files::isRegularFile).mapToLong(p -> {
-                try {
-                    return Files.size(p);
-                } catch (IOException e) {
-                    return 0L;
-                }
-            }).sum();
-        } catch (IOException e) {
-            log.warn("Could not compute storage usage for society {}: {}", societyId, e.getMessage());
-            return 0L;
-        }
     }
 
     private String extensionOf(String filename) {

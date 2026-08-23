@@ -142,7 +142,7 @@ public class DocumentService {
     @Transactional
     public DocumentResponse addAttachment(Long societyId, Long documentId, MultipartFile file) {
         Document document = findOwned(societyId, documentId);
-        String path = fileStorageService.storePdfOnly(file, societyId, "documents");
+        String path = fileStorageService.storeAttachment(file, societyId, "documents");
 
         DocumentAttachment attachment = DocumentAttachment.builder()
                 .document(document)

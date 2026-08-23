@@ -156,7 +156,7 @@ public class MeetingService {
     @Transactional
     public MeetingResponse addAttachment(Long societyId, Long meetingId, MultipartFile file) {
         Meeting meeting = findOwned(societyId, meetingId);
-        String path = fileStorageService.storePdfOnly(file, societyId, "meetings");
+        String path = fileStorageService.storeAttachment(file, societyId, "meetings");
 
         MeetingAttachment attachment = MeetingAttachment.builder()
                 .meeting(meeting)

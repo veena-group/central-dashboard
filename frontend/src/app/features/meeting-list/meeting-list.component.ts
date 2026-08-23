@@ -10,7 +10,8 @@ import { AdminContentApiService, AttachmentResponse, CategoryOption } from '../.
 import { NotificationService } from '../../core/services/notification.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { AttachmentPreviewComponent } from '../../shared/attachment-preview/attachment-preview.component';
-import { validatePdfFile } from '../../core/utils/pdf-file-validator';
+import { AttachmentCardComponent } from '../../shared/attachment-card/attachment-card.component';
+import { validateAttachmentFile } from '../../core/utils/attachment-file-validator';
 
 interface MeetingRow {
   id: number;
@@ -38,7 +39,7 @@ interface SelectedAttachmentFile {
 
 @Component({
   selector: 'app-meeting-list',
-  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent],
+  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent, AttachmentCardComponent],
   templateUrl: './meeting-list.component.html'
 })
 export class MeetingListComponent {
@@ -56,19 +57,21 @@ export class MeetingListComponent {
   readonly meetingPendingDelete = signal<MeetingRow | null>(null);
   readonly categoriesLoading = signal(false);
   readonly createError = signal<string | null>(null);
-  readonly editError = signal<string | null>(null);
   readonly createAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly createAttachmentErrors = signal<string[]>([]);
   readonly createAttachmentDragActive = signal(false);
   readonly editAttachments = signal<AttachmentResponse[]>([]);
   readonly editAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly editAttachmentErrors = signal<string[]>([]);
   readonly attachmentActionInProgress = signal(false);
-  readonly attachmentListTarget = signal<MeetingRow | null>(null);
   readonly pendingAttachmentRemovalIds = signal<ReadonlySet<number>>(new Set());
   readonly previewOpen = signal(false);
   readonly previewLoading = signal(false);
   readonly previewError = signal<string | null>(null);
   readonly previewAttachmentName = signal('');
   readonly previewBlob = signal<Blob | null>(null);
+  readonly previewDownloadable = signal(true);
+  readonly previewAttachment = signal<AttachmentResponse | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<MeetingRow[]>([]);
   readonly page = signal(0);
@@ -129,7 +132,7 @@ export class MeetingListComponent {
 
   load(page: number): void {
     this.loading.set(true);
-    this.api.list<MeetingRow>('/admin/meetings', page, 5, {
+    this.api.list<MeetingRow>('/admin/meetings', page, 6, {
       search: this.searchControl.value.trim() || undefined,
       categoryId: this.categoryFilter() || undefined,
       status: this.statusFilter() || undefined,
@@ -194,6 +197,7 @@ export class MeetingListComponent {
     this.creating.set(false);
     this.createError.set(null);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
     this.createAttachmentDragActive.set(false);
     this.createForm.reset({
       title: '',
@@ -268,7 +272,6 @@ export class MeetingListComponent {
 
   openEditModal(meeting: MeetingRow): void {
     this.editingMeetingId.set(meeting.id);
-    this.editError.set(null);
     this.editForm.reset({
       title: meeting.title,
       categoryId: meeting.categoryId,
@@ -283,29 +286,19 @@ export class MeetingListComponent {
     });
     this.editAttachments.set(meeting.attachments ?? []);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.showEditModal.set(true);
     this.loadCategories();
-  }
-
-  openAttachmentList(meeting: MeetingRow): void {
-    this.attachmentListTarget.set(meeting);
-  }
-
-  closeAttachmentList(): void {
-    if (this.attachmentActionInProgress()) {
-      return;
-    }
-    this.attachmentListTarget.set(null);
   }
 
   closeEditModal(): void {
     this.showEditModal.set(false);
     this.updating.set(false);
     this.editingMeetingId.set(null);
-    this.editError.set(null);
     this.editAttachments.set([]);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.attachmentActionInProgress.set(false);
     this.editForm.reset({
@@ -335,7 +328,6 @@ export class MeetingListComponent {
 
     const value = this.editForm.getRawValue();
     this.updating.set(true);
-    this.editError.set(null);
 
     this.adminApi.updateMeeting(meetingId, {
       title: value.title,
@@ -368,7 +360,6 @@ export class MeetingListComponent {
             error: (err: HttpErrorResponse) => {
               this.updating.set(false);
               const message = err.error?.message || 'Meeting updated, but some attachment changes failed.';
-              this.editError.set(message);
               this.toast.error(message);
               this.load(this.page());
             }
@@ -384,7 +375,6 @@ export class MeetingListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update meeting. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -457,6 +447,7 @@ export class MeetingListComponent {
   clearCreateAttachmentSelection(): void {
     this.createAttachmentDragActive.set(false);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
   }
 
   removeCreateAttachment(index: number): void {
@@ -474,6 +465,7 @@ export class MeetingListComponent {
 
   clearEditAttachmentSelection(): void {
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
   }
 
   removeEditAttachment(index: number): void {
@@ -482,12 +474,14 @@ export class MeetingListComponent {
     this.editAttachmentFiles.set(files);
   }
 
-  openAttachment(attachment: AttachmentResponse): void {
+  openAttachment(meeting: MeetingRow, attachment: AttachmentResponse): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
+    this.previewDownloadable.set(meeting.downloadable);
+    this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
     this.adminApi.fetchStoredFile(attachment.filePath).subscribe({
       next: (blob) => {
@@ -503,8 +497,11 @@ export class MeetingListComponent {
     });
   }
 
-  previewDownloadable(): boolean {
-    return this.attachmentListTarget()?.downloadable ?? this.editForm.controls.downloadable.value;
+  downloadPreviewedAttachment(): void {
+    const attachment = this.previewAttachment();
+    if (attachment) {
+      this.downloadAttachment(attachment);
+    }
   }
 
   closePreviewModal(): void {
@@ -560,11 +557,12 @@ export class MeetingListComponent {
     const existing = this.createAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -581,6 +579,7 @@ export class MeetingListComponent {
       });
     }
 
+    this.createAttachmentErrors.set(errors);
     this.createAttachmentFiles.set(next);
   }
 
@@ -592,11 +591,12 @@ export class MeetingListComponent {
     const existing = this.editAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -613,6 +613,7 @@ export class MeetingListComponent {
       });
     }
 
+    this.editAttachmentErrors.set(errors);
     this.editAttachmentFiles.set(next);
   }
 

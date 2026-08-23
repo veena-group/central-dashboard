@@ -33,80 +33,90 @@
     }
   </div>
 
-  <div class="space-y-3">
-    @for (member of rows(); track member.id) {
-      <div class="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/20 hover:shadow-md">
-        <app-avatar [name]="member.name" [imageUrl]="member.photoUrl" size="xl" />
-
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <h5 class="text-base font-semibold text-foreground">{{ member.name }}</h5>
-            <span class="badge badge-soft-primary">{{ member.role }}</span>
-          </div>
-          <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span class="inline-flex items-center gap-1.5">
-              <app-icon name="building" [size]="14" />
-              {{ member.wing }}-{{ member.flat }}
-            </span>
-            @if (member.phone) {
-              <span class="inline-flex items-center gap-1.5">
-                <app-icon name="phone" [size]="14" />
-                {{ member.phone }}
-              </span>
+  <div class="overflow-x-auto rounded-xl border border-border">
+    <table class="table-base">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Role</th>
+          <th>Wing / Flat</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (member of rows(); track member.id) {
+          <tr>
+            <td>
+              <div class="flex items-center gap-3">
+                <app-avatar [name]="member.name" [imageUrl]="member.photoUrl" size="sm" />
+                <span class="font-medium text-foreground">{{ member.name }}</span>
+              </div>
+            </td>
+            <td><span class="badge badge-soft-primary">{{ member.role }}</span></td>
+            <td class="text-muted-foreground">{{ member.wing }}-{{ member.flat }}</td>
+            <td class="text-muted-foreground">{{ member.phone || '—' }}</td>
+            <td class="text-muted-foreground">{{ member.email }}</td>
+            <td>
+              <div class="flex items-center justify-end gap-1">
+                <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary" (click)="openEditModal(member)" aria-label="Edit member" title="Edit">
+                  <app-icon name="edit" [size]="14" />
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  [disabled]="!canRemoveMember(member)"
+                  [title]="removeMemberTitle()"
+                  aria-label="Remove member"
+                  (click)="requestDeleteMember(member)">
+                  <app-icon name="trash" [size]="14" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          @if (loading()) {
+            @for (i of [1,2,3,4,5]; track i) {
+              <tr>
+                <td>
+                  <div class="flex items-center gap-3">
+                    <div class="skeleton h-8 w-8 rounded-full"></div>
+                    <div class="skeleton h-4 w-24"></div>
+                  </div>
+                </td>
+                <td><div class="skeleton h-4 w-16"></div></td>
+                <td><div class="skeleton h-4 w-16"></div></td>
+                <td><div class="skeleton h-4 w-20"></div></td>
+                <td><div class="skeleton h-4 w-32"></div></td>
+                <td></td>
+              </tr>
             }
-            <span class="inline-flex min-w-0 items-center gap-1.5">
-              <app-icon name="mail" [size]="14" />
-              <span class="truncate">{{ member.email }}</span>
-            </span>
-          </div>
-        </div>
-
-        <div class="flex shrink-0 items-center gap-1">
-          <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary" (click)="openEditModal(member)" aria-label="Edit member" title="Edit">
-            <app-icon name="edit" [size]="14" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            [disabled]="!canRemoveMember(member)"
-            [title]="removeMemberTitle()"
-            aria-label="Remove member"
-            (click)="requestDeleteMember(member)">
-            <app-icon name="trash" [size]="14" />
-          </button>
-        </div>
-      </div>
-    } @empty {
-      @if (loading()) {
-        @for (i of [1,2,3,4]; track i) {
-          <div class="flex items-center gap-4 rounded-2xl border border-border p-4">
-            <div class="skeleton h-[70px] w-[70px] rounded-full flex-shrink-0"></div>
-            <div class="min-w-0 flex-1 space-y-2">
-              <div class="skeleton h-4 w-1/3"></div>
-              <div class="skeleton h-3 w-1/2"></div>
-              <div class="skeleton h-3 w-1/4"></div>
-            </div>
-          </div>
+          } @else if (hasActiveFilters()) {
+            <tr>
+              <td colspan="6" class="py-8 text-center">
+                <h5 class="text-base font-semibold text-foreground">No members match your filters</h5>
+                <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different search term or clear the filters.</p>
+                <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
+              </td>
+            </tr>
+          } @else {
+            <tr>
+              <td colspan="6" class="py-8 text-center">
+                <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <app-icon name="members" [size]="22" />
+                </div>
+                <h5 class="text-base font-semibold text-foreground">No members added yet</h5>
+                <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                  Start by adding residents so you can manage profiles, roles, and society communication.
+                </p>
+                <button type="button" class="btn btn-primary btn-sm mt-4" (click)="openCreateModal()">Add Member</button>
+              </td>
+            </tr>
+          }
         }
-      } @else if (hasActiveFilters()) {
-        <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
-          <h5 class="text-base font-semibold text-foreground">No members match your filters</h5>
-          <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different search term or clear the filters.</p>
-          <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
-        </div>
-      } @else {
-        <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
-          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <app-icon name="members" [size]="22" />
-          </div>
-          <h5 class="text-base font-semibold text-foreground">No members added yet</h5>
-          <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Start by adding residents so you can manage profiles, roles, and society communication.
-          </p>
-          <button type="button" class="btn btn-primary btn-sm mt-4" (click)="openCreateModal()">Add Member</button>
-        </div>
-      }
-    }
+      </tbody>
+    </table>
   </div>
 
   <div class="mt-4">

@@ -41,7 +41,7 @@ public class CommitteeController {
     public ApiResponse<PageResponse<CommitteeResponse>> list(@RequestParam(defaultValue = "0") int page,
                                                                 @RequestParam(defaultValue = "20") int size,
                                                                 @RequestParam(required = false) String search) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Committee members fetched successfully",
                 committeeService.list(currentUser.requireSocietyId(), pageable, search));
     }

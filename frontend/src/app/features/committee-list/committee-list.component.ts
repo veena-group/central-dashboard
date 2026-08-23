@@ -250,7 +250,6 @@ export class CommitteeListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update committee member. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -343,7 +342,6 @@ export class CommitteeListComponent {
       this.createPhotoFileType.set('');
       this.createPhotoFileSize.set('');
       this.createPhotoError.set(validationError);
-      this.toast.warning(validationError);
       return;
     }
 

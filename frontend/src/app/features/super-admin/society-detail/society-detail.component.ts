@@ -302,7 +302,6 @@ export class SocietyDetailComponent {
   saveFeatures(): void {
     if (this.featuresForm.invalid) {
       this.featuresForm.markAllAsTouched();
-      this.toast.error('Set a valid limit (1 or more) for every enabled feature before saving.');
       return;
     }
 

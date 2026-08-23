@@ -44,7 +44,7 @@ public class EventController {
                                                             @RequestParam(required = false) String search,
                                                             @RequestParam(required = false) Long categoryId,
                                                             @RequestParam(required = false) EventStatus status) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Events fetched successfully",
                 eventService.list(currentUser.requireSocietyId(), pageable, search, categoryId, status));
     }

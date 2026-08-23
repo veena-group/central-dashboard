@@ -5,6 +5,7 @@ import { debounceTime } from 'rxjs';
 import { MemberApiService } from '../../../core/services/member-api.service';
 import { CategoryOption } from '../../../core/services/admin-content-api.service';
 import { IconComponent } from '../../../shared/icon/icon.component';
+import { AttachmentCardComponent } from '../../../shared/attachment-card/attachment-card.component';
 import { AttachmentPreviewComponent } from '../../../shared/attachment-preview/attachment-preview.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 
@@ -28,11 +29,11 @@ interface AttachmentRow {
 
 @Component({
   selector: 'app-my-forms',
-  imports: [IconComponent, AttachmentPreviewComponent, PaginationComponent, DatePipe, ReactiveFormsModule],
+  imports: [IconComponent, AttachmentPreviewComponent, PaginationComponent, DatePipe, ReactiveFormsModule, AttachmentCardComponent],
   templateUrl: './my-forms.component.html'
 })
 export class MyFormsComponent {
-  private static readonly PAGE_SIZE = 5;
+  private static readonly PAGE_SIZE = 6;
 
   private readonly api = inject(MemberApiService);
 
@@ -43,13 +44,14 @@ export class MyFormsComponent {
   readonly first = signal(true);
   readonly last = signal(true);
   readonly expandedDescriptionIds = signal<ReadonlySet<number>>(new Set());
-  readonly attachmentListTarget = signal<FormRow | null>(null);
   readonly attachmentActionInProgress = signal(false);
   readonly previewOpen = signal(false);
   readonly previewLoading = signal(false);
   readonly previewError = signal<string | null>(null);
   readonly previewAttachmentName = signal('');
   readonly previewBlob = signal<Blob | null>(null);
+  readonly previewDownloadable = signal(false);
+  readonly previewAttachment = signal<AttachmentRow | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly yearControl = new FormControl('', { nonNullable: true });
@@ -106,23 +108,14 @@ export class MyFormsComponent {
     this.load(0);
   }
 
-  openAttachmentList(row: FormRow): void {
-    this.attachmentListTarget.set(row);
-  }
-
-  closeAttachmentList(): void {
-    if (this.attachmentActionInProgress()) {
-      return;
-    }
-    this.attachmentListTarget.set(null);
-  }
-
-  openAttachment(attachment: AttachmentRow): void {
+  openAttachment(row: FormRow, attachment: AttachmentRow): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
+    this.previewDownloadable.set(row.downloadable);
+    this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
     this.api.fetchStoredFile(attachment.filePath).subscribe({
       next: (blob) => {
@@ -138,8 +131,11 @@ export class MyFormsComponent {
     });
   }
 
-  previewDownloadable(): boolean {
-    return this.attachmentListTarget()?.downloadable ?? false;
+  downloadPreviewedAttachment(): void {
+    const attachment = this.previewAttachment();
+    if (attachment) {
+      this.downloadAttachment(attachment);
+    }
   }
 
   closePreviewModal(): void {

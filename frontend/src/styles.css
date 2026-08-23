@@ -259,6 +259,35 @@
     @apply inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground;
   }
 
+  /* Styles content produced by mammoth.js (docx -> HTML) inside the attachment preview modal. */
+  .docx-preview {
+    @apply text-sm text-foreground leading-relaxed;
+  }
+  .docx-preview :is(h1, h2, h3, h4, h5, h6) {
+    @apply font-semibold text-foreground mt-4 mb-2;
+  }
+  .docx-preview p {
+    @apply mb-3;
+  }
+  .docx-preview :is(ul, ol) {
+    @apply mb-3 pl-6;
+  }
+  .docx-preview ul {
+    @apply list-disc;
+  }
+  .docx-preview ol {
+    @apply list-decimal;
+  }
+  .docx-preview table {
+    @apply w-full border-collapse mb-3;
+  }
+  .docx-preview :is(th, td) {
+    @apply border border-border px-2 py-1 text-left align-top;
+  }
+  .docx-preview img {
+    @apply max-w-full h-auto my-2 rounded;
+  }
+
   .form-layout {
     @apply space-y-4;
   }

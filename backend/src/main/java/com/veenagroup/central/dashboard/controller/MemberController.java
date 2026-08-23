@@ -98,7 +98,7 @@ public class MemberController {
                                                             @RequestParam(defaultValue = "20") int size,
                                                             @RequestParam(required = false) String search,
                                                             @RequestParam(required = false) Role role) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Members fetched successfully",
                 memberService.list(currentUser.requireSocietyId(), currentUser.userId(), pageable, search, role));
     }

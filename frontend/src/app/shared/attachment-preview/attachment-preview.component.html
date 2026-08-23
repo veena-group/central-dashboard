@@ -1,7 +1,7 @@
 @if (open()) {
-  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="close()">
-    <div class="card w-full max-w-5xl max-h-[90vh] overflow-auto" (click)="$event.stopPropagation()">
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm touch-none"></div>
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 touch-none" (click)="close()">
+    <div class="card w-full max-w-5xl max-h-[90dvh] overflow-auto overscroll-contain" (click)="$event.stopPropagation()">
       <div class="card-header">
         <div>
           <h4 class="card-title">Attachment Preview</h4>
@@ -23,22 +23,84 @@
           <div class="text-sm text-muted-foreground">Loading preview...</div>
         } @else if (error()) {
           <div class="text-sm text-destructive">{{ error() }}</div>
+        } @else if (converting()) {
+          <div class="text-sm text-muted-foreground">Rendering preview...</div>
         } @else {
           @if (mode() === 'image') {
-            <img [src]="objectUrl()" [alt]="fileName()" class="max-h-[70vh] w-full object-contain rounded-lg border border-border" />
+            <img [src]="objectUrl()" [alt]="fileName()" class="max-h-[70dvh] w-full object-contain rounded-lg border border-border" />
           }
           @if (mode() === 'pdf') {
-            <!-- No sandbox attribute: Chrome's built-in PDF viewer extension refuses to render at all
-                 inside a sandboxed frame (even with allow-scripts allow-same-origin, which Chrome itself
-                 warns "can escape its sandboxing" and simply declines to use). The real security boundary
-                 here isn't iframe sandboxing - it's that the backend only ever serves this endpoint with
-                 Content-Type: application/pdf plus X-Content-Type-Options: nosniff for files that passed
-                 PDF-only upload validation, so the browser can never reinterpret the bytes as HTML/script
-                 regardless of how this frame is embedded. -->
-            <iframe [src]="safeUrl()" class="w-full h-[70vh] rounded-lg border border-border" title="Attachment preview"></iframe>
+            @if (isTouchDevice) {
+              <!-- Mobile browsers don't reliably give an iframed PDF a touch-scrollable native
+                   viewer the way desktop browsers do, so instead of embedding it, open the blob
+                   directly - that invokes the browser's own full PDF viewer, same as tapping a
+                   PDF link anywhere else on mobile. -->
+              <div class="h-[70dvh] rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center p-6 text-center">
+                <div>
+                  <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm ring-1 ring-border">
+                    <app-icon name="documents" [size]="22" />
+                  </div>
+                  <h5 class="text-base font-semibold text-foreground">Tap below to open this PDF</h5>
+                  <p class="mt-2 text-sm text-muted-foreground">PDFs open best in your browser's own viewer on mobile.</p>
+                  <a [href]="objectUrl()" target="_blank" rel="noopener" class="btn btn-primary btn-sm mt-4 inline-flex items-center gap-1.5">
+                    Open PDF
+                  </a>
+                </div>
+              </div>
+            } @else {
+              <!-- No sandbox attribute: Chrome's built-in PDF viewer extension refuses to render at all
+                   inside a sandboxed frame (even with allow-scripts allow-same-origin, which Chrome itself
+                   warns "can escape its sandboxing" and simply declines to use). The real security boundary
+                   here isn't iframe sandboxing - it's that the backend only ever serves this endpoint with
+                   Content-Type: application/pdf plus X-Content-Type-Options: nosniff for files that passed
+                   PDF-only upload validation, so the browser can never reinterpret the bytes as HTML/script
+                   regardless of how this frame is embedded. -->
+              <iframe [src]="safeUrl()" class="w-full h-[70dvh] rounded-lg border border-border" title="Attachment preview"></iframe>
+            }
+          }
+          @if (mode() === 'docx') {
+            <!-- docHtml comes from mammoth.js's docx->HTML conversion, bound without bypassing
+                 Angular's sanitizer - any script-capable markup mammoth could ever emit gets stripped
+                 automatically, the same as binding any other untrusted HTML string. -->
+            <div class="docx-preview h-[70dvh] overflow-auto rounded-lg border border-border p-5 bg-background" [innerHTML]="docHtml()"></div>
+          }
+          @if (mode() === 'xlsx') {
+            <div class="h-[70dvh] flex flex-col gap-3">
+              @if (sheets().length > 1) {
+                <div class="flex items-center gap-1 flex-wrap">
+                  @for (sheet of sheets(); track sheet.name; let i = $index) {
+                    <button type="button"
+                      class="btn btn-sm"
+                      [class.btn-primary]="activeSheetIndex() === i"
+                      [class.btn-soft-secondary]="activeSheetIndex() !== i"
+                      (click)="setActiveSheet(i)">
+                      {{ sheet.name }}
+                    </button>
+                  }
+                </div>
+              }
+              @if (sheets()[activeSheetIndex()]; as activeSheet) {
+                @if (activeSheet.truncated) {
+                  <p class="text-xs text-muted-foreground">Showing the first 300 rows of this sheet. Download the file to see the rest.</p>
+                }
+                <div class="overflow-auto rounded-lg border border-border flex-1">
+                  <table class="table-base">
+                    <tbody>
+                      @for (row of activeSheet.rows; track $index) {
+                        <tr>
+                          @for (cell of row; track $index) {
+                            <td>{{ cell }}</td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
           }
           @if (mode() === 'unsupported') {
-            <div class="h-[70vh] rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center p-6 text-center">
+            <div class="h-[70dvh] rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center p-6 text-center">
               <div>
                 <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm ring-1 ring-border">
                   <app-icon name="documents" [size]="22" />

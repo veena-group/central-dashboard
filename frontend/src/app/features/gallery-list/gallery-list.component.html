@@ -172,6 +172,13 @@
                       }
                     </div>
                     <input id="galleryFile" type="file" class="hidden" multiple accept="image/*" (change)="onFileSelected($event)">
+                    @if (uploadErrors().length) {
+                      <div class="mt-2 space-y-0.5">
+                        @for (err of uploadErrors(); track err) {
+                          <p class="text-xs text-destructive">{{ err }}</p>
+                        }
+                      </div>
+                    }
                     @if (selectedImages().length) {
                       <div class="upload-file-list mt-3">
                         @for (item of selectedImages(); track $index) {
@@ -221,6 +228,10 @@
               </div>
             </section>
           </div>
+
+          @if (createError()) {
+            <p class="text-sm text-destructive">{{ createError() }}</p>
+          }
 
           <div class="flex gap-2">
             <button type="submit" class="btn btn-primary" [disabled]="creating() || categories().length === 0 || createForm.invalid || !selectedImages().length">

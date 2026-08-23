@@ -55,7 +55,7 @@ public class SuperAdminController {
                                                                 @RequestParam(required = false) String search,
                                                                 @RequestParam(required = false) String hostingState,
                                                                 @RequestParam(required = false) String subscriptionState) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Societies fetched successfully", societyService.getAll(pageable, search, hostingState, subscriptionState));
     }
 

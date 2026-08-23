@@ -52,6 +52,10 @@
 
             </div>
 
+            @if (photoError()) {
+              <p class="text-sm text-destructive">{{ photoError() }}</p>
+            }
+
             @if (stagedPhotoFile(); as file) {
               <div class="upload-file-list">
                 <div class="upload-file-row">

@@ -1,0 +1,37 @@
+<div class="group relative w-full">
+  <button
+    type="button"
+    class="flex w-full flex-col overflow-hidden rounded-lg border border-border bg-white text-left transition-colors hover:border-primary hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+    [disabled]="disabled()"
+    (click)="view.emit()"
+    [title]="fileName()">
+    <div class="flex h-24 w-full items-center justify-center bg-muted/40">
+      @if (kind() === 'image') {
+        <app-secure-image [src]="imageUrl()" [alt]="fileName()" cssClass="h-full w-full object-cover" />
+      } @else {
+        <span class="text-2xl font-bold tracking-wide text-muted-foreground/25">{{ label() }}</span>
+      }
+    </div>
+    <div class="relative flex items-center gap-2 border-t border-border px-2 py-2">
+      @if (label()) {
+        <span [class]="'flex h-6 w-9 flex-shrink-0 items-center justify-center rounded text-[10px] font-bold ' + badgeClass()">{{ label() }}</span>
+      }
+      <span class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{{ fileName() }}</span>
+      <span class="pointer-events-none absolute -bottom-px -right-px h-5 w-5 overflow-hidden">
+        <span class="absolute bottom-0 right-0 h-5 w-5 bg-border" style="clip-path: polygon(100% 0, 100% 100%, 0 100%);"></span>
+        <span class="absolute bottom-[1px] right-[1px] h-[18px] w-[18px] bg-white" style="clip-path: polygon(100% 0, 100% 100%, 0 100%);"></span>
+      </span>
+    </div>
+  </button>
+  @if (downloadable()) {
+    <button
+      type="button"
+      class="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70 disabled:pointer-events-none"
+      [disabled]="disabled()"
+      (click)="onDownloadClick($event)"
+      aria-label="Download attachment"
+      title="Download">
+      <app-icon name="download" [size]="12" />
+    </button>
+  }
+</div>

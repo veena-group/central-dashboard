@@ -36,11 +36,11 @@
     }
   </div>
 
-  <div class="space-y-3">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     @for (doc of rows(); track doc.id) {
       <div class="rounded-xl border border-border p-5 transition-colors hover:bg-muted/20">
         <div class="flex items-start justify-between gap-4">
-          <h5 class="min-w-0 truncate text-base font-semibold text-foreground">{{ doc.title }}</h5>
+          <h5 class="min-w-0 line-clamp-2 text-base font-semibold text-foreground" [title]="doc.title">{{ doc.title }}</h5>
           <span class="whitespace-nowrap text-xs text-muted-foreground/80">{{ doc.createdAt | date:'MMM d, y' }}</span>
         </div>
 
@@ -52,7 +52,7 @@
         </div>
 
         @if (doc.description) {
-          <p class="mt-3 text-sm leading-relaxed text-muted-foreground" [class.line-clamp-3]="isLongText(doc.description) && !isDescriptionExpanded(doc.id)">{{ doc.description }}</p>
+          <p class="mt-3 text-sm leading-relaxed text-muted-foreground" [class.line-clamp-2]="isLongText(doc.description) && !isDescriptionExpanded(doc.id)">{{ doc.description }}</p>
           @if (isLongText(doc.description)) {
             <button type="button" class="mt-1 text-xs font-medium text-primary hover:underline" (click)="toggleDescription(doc.id)">
               {{ isDescriptionExpanded(doc.id) ? 'Show less' : 'Show more' }}
@@ -64,14 +64,17 @@
           <p class="mt-3 text-xs text-muted-foreground/70">Year {{ doc.year }}</p>
         }
 
-        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        <div class="mt-3 border-t border-border/60 pt-3">
           @if (doc.attachments.length) {
-            @for (attachment of doc.attachments; track attachment.id) {
-              <button type="button" class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors" (click)="openAttachmentList(doc)" [title]="attachment.fileName">
-                <app-icon name="documents" [size]="12" />
-                <span class="max-w-[160px] truncate">{{ attachment.fileName }}</span>
-              </button>
-            }
+            <div class="grid grid-cols-3 gap-2">
+              @for (attachment of doc.attachments; track attachment.id) {
+                <app-attachment-card
+                  [fileName]="attachment.fileName"
+                  [filePath]="attachment.filePath"
+                  [disabled]="attachmentActionInProgress()"
+                  (view)="openAttachment(doc, attachment)" />
+              }
+            </div>
           } @else {
             <span class="text-xs text-muted-foreground">No attachments</span>
           }
@@ -96,13 +99,13 @@
           </div>
         }
       } @else if (hasActiveFilters()) {
-        <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
+        <div class="col-span-full rounded-xl border border-dashed border-border px-6 py-8 text-center">
           <h5 class="text-base font-semibold text-foreground">No documents match your filters</h5>
           <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different search term or clear the filters.</p>
           <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
         </div>
       } @else {
-        <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
+        <div class="col-span-full rounded-xl border border-dashed border-border px-6 py-8 text-center">
           <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <app-icon name="documents" [size]="22" />
           </div>
@@ -121,44 +124,6 @@
   </div>
 </div>
 
-@if (attachmentListTarget(); as target) {
-  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeAttachmentList()">
-    <div class="card w-full max-w-2xl max-h-[85vh] overflow-auto" (click)="$event.stopPropagation()">
-      <div class="card-header">
-        <div>
-          <h4 class="card-title">Attachments</h4>
-          <p class="text-sm text-muted-foreground">{{ target.title }} • {{ target.isPublic ? 'Public' : 'Members only' }}</p>
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="closeAttachmentList()" aria-label="Close modal" title="Close">
-          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
-        </button>
-      </div>
-      <div class="p-5 space-y-3">
-        @if (target.attachments.length) {
-          @for (attachment of target.attachments; track attachment.id) {
-            <div class="upload-file-row">
-              <p class="text-sm text-foreground font-medium">{{ attachment.fileName }}</p>
-              <div class="flex items-center gap-2">
-                <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-view" [disabled]="attachmentActionInProgress()" (click)="openAttachment(attachment)" aria-label="View attachment" title="View">
-                  <app-icon name="eye" [size]="14" />
-                </button>
-                @if (target.downloadable) {
-                  <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-download" [disabled]="attachmentActionInProgress()" (click)="downloadAttachment(attachment)" aria-label="Download attachment" title="Download">
-                    <app-icon name="download" [size]="14" />
-                  </button>
-                }
-              </div>
-            </div>
-          }
-        } @else {
-          <p class="text-sm text-muted-foreground">No attachments available.</p>
-        }
-      </div>
-    </div>
-  </div>
-}
-
 <app-attachment-preview
   [open]="previewOpen()"
   [loading]="previewLoading()"
@@ -166,4 +131,5 @@
   [fileName]="previewAttachmentName()"
   [blob]="previewBlob()"
   [downloadable]="previewDownloadable()"
+  (download)="downloadPreviewedAttachment()"
   (closed)="closePreviewModal()" />

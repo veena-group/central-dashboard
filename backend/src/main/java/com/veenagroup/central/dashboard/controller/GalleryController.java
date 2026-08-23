@@ -47,7 +47,7 @@ public class GalleryController {
     public ApiResponse<PageResponse<GalleryResponse>> list(@RequestParam(defaultValue = "0") int page,
                                                               @RequestParam(defaultValue = "20") int size,
                                                               @RequestParam(required = false) Long albumId) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Gallery items fetched successfully",
                 galleryService.list(currentUser.requireSocietyId(), pageable, albumId));
     }

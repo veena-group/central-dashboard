@@ -44,7 +44,7 @@ public class FormController {
                                                            @RequestParam(required = false) Long categoryId,
                                                            @RequestParam(required = false) Integer year,
                                                            @RequestParam(required = false) Boolean isPublic) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Forms fetched successfully",
                 formService.list(currentUser.requireSocietyId(), pageable, search, categoryId, year, isPublic));
     }

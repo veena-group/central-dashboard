@@ -160,7 +160,7 @@ public class NoticeService {
     @Transactional
     public NoticeResponse addAttachment(Long societyId, Long noticeId, MultipartFile file) {
         Notice notice = findOwned(societyId, noticeId);
-        String path = fileStorageService.storePdfOnly(file, societyId, "notices");
+        String path = fileStorageService.storeAttachment(file, societyId, "notices");
 
         NoticeAttachment attachment = NoticeAttachment.builder()
                 .notice(notice)

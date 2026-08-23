@@ -10,7 +10,8 @@ import { AdminContentApiService, AttachmentResponse, CategoryOption } from '../.
 import { NotificationService } from '../../core/services/notification.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { AttachmentPreviewComponent } from '../../shared/attachment-preview/attachment-preview.component';
-import { validatePdfFile } from '../../core/utils/pdf-file-validator';
+import { AttachmentCardComponent } from '../../shared/attachment-card/attachment-card.component';
+import { validateAttachmentFile } from '../../core/utils/attachment-file-validator';
 
 interface DocumentRow {
   id: number;
@@ -34,7 +35,7 @@ interface SelectedAttachmentFile {
 
 @Component({
   selector: 'app-document-list',
-  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent],
+  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent, AttachmentCardComponent],
   templateUrl: './document-list.component.html'
 })
 export class DocumentListComponent {
@@ -54,9 +55,11 @@ export class DocumentListComponent {
   readonly createError = signal<string | null>(null);
   readonly editError = signal<string | null>(null);
   readonly createAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly createAttachmentErrors = signal<string[]>([]);
   readonly createAttachmentDragActive = signal(false);
   readonly editAttachments = signal<AttachmentResponse[]>([]);
   readonly editAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly editAttachmentErrors = signal<string[]>([]);
   readonly attachmentActionInProgress = signal(false);
   readonly pendingAttachmentRemovalIds = signal<ReadonlySet<number>>(new Set());
   readonly expandedDescriptionIds = signal<ReadonlySet<number>>(new Set());
@@ -121,7 +124,7 @@ export class DocumentListComponent {
     this.loading.set(true);
     const year = this.toTrimmedString(this.yearControl.value);
     const search = this.toTrimmedString(this.searchControl.value);
-    this.api.list<DocumentRow>('/admin/documents', page, 5, {
+    this.api.list<DocumentRow>('/admin/documents', page, 6, {
       search: search || undefined,
       categoryId: this.categoryFilter() || undefined,
       year: year && !Number.isNaN(Number(year)) ? Number(year) : undefined,
@@ -175,6 +178,7 @@ export class DocumentListComponent {
     this.creating.set(false);
     this.createError.set(null);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
     this.createAttachmentDragActive.set(false);
     this.createForm.reset({
       title: '',
@@ -199,7 +203,6 @@ export class DocumentListComponent {
     if (parsedYear !== null && Number.isNaN(parsedYear)) {
       const message = 'Year must be a valid number.';
       this.createError.set(message);
-      this.toast.warning(message);
       return;
     }
 
@@ -263,6 +266,7 @@ export class DocumentListComponent {
     });
     this.editAttachments.set(document.attachments ?? []);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.showEditModal.set(true);
     this.loadCategories();
@@ -275,6 +279,7 @@ export class DocumentListComponent {
     this.editError.set(null);
     this.editAttachments.set([]);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.attachmentActionInProgress.set(false);
     this.editForm.reset({
@@ -304,7 +309,6 @@ export class DocumentListComponent {
     if (parsedYear !== null && Number.isNaN(parsedYear)) {
       const message = 'Year must be a valid number.';
       this.editError.set(message);
-      this.toast.warning(message);
       return;
     }
 
@@ -338,7 +342,6 @@ export class DocumentListComponent {
             error: (err: HttpErrorResponse) => {
               this.updating.set(false);
               const message = err.error?.message || 'Document updated, but some attachment changes failed.';
-              this.editError.set(message);
               this.toast.error(message);
               this.load(this.page());
             }
@@ -354,7 +357,6 @@ export class DocumentListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update document. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -427,6 +429,7 @@ export class DocumentListComponent {
   clearCreateAttachmentSelection(): void {
     this.createAttachmentDragActive.set(false);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
   }
 
   removeCreateAttachment(index: number): void {
@@ -444,6 +447,7 @@ export class DocumentListComponent {
 
   clearEditAttachmentSelection(): void {
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
   }
 
   removeEditAttachment(index: number): void {
@@ -536,11 +540,12 @@ export class DocumentListComponent {
     const existing = this.createAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -557,6 +562,7 @@ export class DocumentListComponent {
       });
     }
 
+    this.createAttachmentErrors.set(errors);
     this.createAttachmentFiles.set(next);
   }
 
@@ -568,11 +574,12 @@ export class DocumentListComponent {
     const existing = this.editAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -589,6 +596,7 @@ export class DocumentListComponent {
       });
     }
 
+    this.editAttachmentErrors.set(errors);
     this.editAttachmentFiles.set(next);
   }
 

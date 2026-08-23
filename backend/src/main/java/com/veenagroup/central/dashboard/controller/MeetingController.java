@@ -48,7 +48,7 @@ public class MeetingController {
                                                               @RequestParam(required = false) Long categoryId,
                                                               @RequestParam(required = false) MeetingStatus status,
                                                               @RequestParam(required = false) MeetingPlatform platform) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Meetings fetched successfully",
                 meetingService.list(currentUser.requireSocietyId(), pageable, search, categoryId, status, platform));
     }

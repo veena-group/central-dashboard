@@ -142,7 +142,7 @@ public class FormService {
     @Transactional
     public FormResponse addAttachment(Long societyId, Long formId, MultipartFile file) {
         Form form = findOwned(societyId, formId);
-        String path = fileStorageService.storePdfOnly(file, societyId, "forms");
+        String path = fileStorageService.storeAttachment(file, societyId, "forms");
 
         FormAttachment attachment = FormAttachment.builder()
                 .form(form)

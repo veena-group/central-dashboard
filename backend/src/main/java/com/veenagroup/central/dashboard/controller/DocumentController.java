@@ -44,7 +44,7 @@ public class DocumentController {
                                                                @RequestParam(required = false) Long categoryId,
                                                                @RequestParam(required = false) Integer year,
                                                                @RequestParam(required = false) Boolean isPublic) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Documents fetched successfully",
                 documentService.list(currentUser.requireSocietyId(), pageable, search, categoryId, year, isPublic));
     }

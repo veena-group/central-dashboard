@@ -92,7 +92,7 @@ public class MemberDashboardController {
                                                                @RequestParam(required = false) String search,
                                                                @RequestParam(required = false) Long categoryId,
                                                                @RequestParam(required = false) Boolean isPublic) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Notices fetched successfully",
                 noticeService.list(currentUser.requireSocietyId(), pageable, search, categoryId, isPublic));
     }
@@ -125,7 +125,7 @@ public class MemberDashboardController {
                                                                     @RequestParam(required = false) Long categoryId,
                                                                     @RequestParam(required = false) Integer year,
                                                                     @RequestParam(required = false) Boolean isPublic) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Documents fetched successfully",
                 documentService.list(currentUser.requireSocietyId(), pageable, search, categoryId, year, isPublic));
     }
@@ -158,7 +158,7 @@ public class MemberDashboardController {
                                                             @RequestParam(required = false) Long categoryId,
                                                             @RequestParam(required = false) Integer year,
                                                             @RequestParam(required = false) Boolean isPublic) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Forms fetched successfully",
                 formService.list(currentUser.requireSocietyId(), pageable, search, categoryId, year, isPublic));
     }
@@ -188,7 +188,7 @@ public class MemberDashboardController {
     @GetMapping(value = "/committee", params = {"page", "size"})
     public ApiResponse<PageResponse<CommitteeResponse>> committee(@RequestParam int page, @RequestParam int size,
                                                                     @RequestParam(required = false) String search) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Committee fetched successfully",
                 committeeService.list(currentUser.requireSocietyId(), pageable, search));
     }
@@ -204,7 +204,7 @@ public class MemberDashboardController {
                                                                  @RequestParam(required = false) Long categoryId,
                                                                  @RequestParam(required = false) MeetingStatus status,
                                                                  @RequestParam(required = false) MeetingPlatform platform) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Meetings fetched successfully",
                 meetingService.list(currentUser.requireSocietyId(), pageable, search, categoryId, status, platform));
     }
@@ -236,7 +236,7 @@ public class MemberDashboardController {
                                                              @RequestParam(required = false) String search,
                                                              @RequestParam(required = false) Long categoryId,
                                                              @RequestParam(required = false) EventStatus status) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Events fetched successfully",
                 eventService.list(currentUser.requireSocietyId(), pageable, search, categoryId, status));
     }
@@ -266,7 +266,7 @@ public class MemberDashboardController {
     @GetMapping(value = "/gallery", params = {"page", "size"})
     public ApiResponse<PageResponse<GalleryResponse>> gallery(@RequestParam int page, @RequestParam int size,
                                                                 @RequestParam(required = false) Long albumId) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Gallery fetched successfully",
                 galleryService.list(currentUser.requireSocietyId(), pageable, albumId));
     }

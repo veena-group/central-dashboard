@@ -306,7 +306,6 @@ export class SocietyListComponent {
         error: (err) => {
           this.creating.set(false);
           const message = err?.error?.message ?? 'Could not onboard society';
-          this.createError.set(message);
           this.toast.error(message);
           this.modalCard?.nativeElement.scrollTo({ top: 0, behavior: 'smooth' });
         }

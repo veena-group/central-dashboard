@@ -4,8 +4,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 25MB
+      max-file-size: 500MB
+      max-request-size: 510MB
 
   mvc:
     throw-exception-if-no-handler-found: true
@@ -15,7 +15,7 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/central_dashboard
-    username: ${DB_USERNAME:postgres}
+    username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
@@ -39,7 +39,6 @@ app:
 
   storage:
     base-path: "./uploads"
-    max-bytes-per-society: ${MAX_BYTES_PER_SOCIETY:524288000}
 
   security:
     domain-validation:

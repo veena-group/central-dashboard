@@ -53,11 +53,11 @@
     }
   </div>
 
-  <div class="space-y-3">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     @for (meeting of rows(); track meeting.id) {
       <div class="rounded-xl border border-border p-5 transition-colors hover:bg-muted/20">
         <div class="flex items-start justify-between gap-4">
-          <h5 class="min-w-0 truncate text-base font-semibold text-foreground">{{ meeting.title }}</h5>
+          <h5 class="min-w-0 line-clamp-2 text-base font-semibold text-foreground" [title]="meeting.title">{{ meeting.title }}</h5>
           <div class="flex shrink-0 items-center gap-3">
             <span class="whitespace-nowrap text-xs text-muted-foreground/80">{{ meeting.createdAt | date:'MMM d, y' }}</span>
             <div class="flex items-center gap-1">
@@ -80,7 +80,7 @@
         </div>
 
         @if (meeting.agenda) {
-          <p class="mt-3 text-sm leading-relaxed text-muted-foreground" [class.line-clamp-3]="isLongText(meeting.agenda) && !isDescriptionExpanded(meeting.id)">{{ meeting.agenda }}</p>
+          <p class="mt-3 text-sm leading-relaxed text-muted-foreground" [class.line-clamp-2]="isLongText(meeting.agenda) && !isDescriptionExpanded(meeting.id)">{{ meeting.agenda }}</p>
           @if (isLongText(meeting.agenda)) {
             <button type="button" class="mt-1 text-xs font-medium text-primary hover:underline" (click)="toggleDescription(meeting.id)">
               {{ isDescriptionExpanded(meeting.id) ? 'Show less' : 'Show more' }}
@@ -92,7 +92,7 @@
           {{ meeting.meetingDate }} &middot; {{ meeting.platform }}
         </p>
 
-        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        <div class="mt-3 flex flex-wrap items-center gap-2">
           @if (meeting.meetingUrl) {
             <a [href]="meeting.meetingUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors">
               <app-icon name="meetings" [size]="12" />
@@ -105,13 +105,19 @@
               View recording
             </a>
           }
+        </div>
+
+        <div class="mt-3 border-t border-border/60 pt-3">
           @if (meeting.attachments.length) {
-            @for (attachment of meeting.attachments; track attachment.id) {
-              <button type="button" class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors" (click)="openAttachmentList(meeting)" [title]="attachment.fileName">
-                <app-icon name="documents" [size]="12" />
-                <span class="max-w-[160px] truncate">{{ attachment.fileName }}</span>
-              </button>
-            }
+            <div class="grid grid-cols-3 gap-2">
+              @for (attachment of meeting.attachments; track attachment.id) {
+                <app-attachment-card
+                  [fileName]="attachment.fileName"
+                  [filePath]="attachment.filePath"
+                  [disabled]="attachmentActionInProgress()"
+                  (view)="openAttachment(meeting, attachment)" />
+              }
+            </div>
           } @else {
             <span class="text-xs text-muted-foreground">No attachments</span>
           }
@@ -136,13 +142,13 @@
           </div>
         }
       } @else if (hasActiveFilters()) {
-        <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
+        <div class="col-span-full rounded-xl border border-dashed border-border px-6 py-8 text-center">
           <h5 class="text-base font-semibold text-foreground">No meetings match your filters</h5>
           <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different search term or clear the filters.</p>
           <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
         </div>
       } @else {
-        <div class="rounded-xl border border-dashed border-border px-6 py-8 text-center">
+        <div class="col-span-full rounded-xl border border-dashed border-border px-6 py-8 text-center">
           <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <app-icon name="meetings" [size]="22" />
           </div>
@@ -274,7 +280,7 @@
                     (dragleave)="onCreateAttachmentDragLeave($event)"
                     (drop)="onCreateAttachmentDrop($event)">
                     <p class="text-sm font-medium text-foreground mb-1">Drag and drop attachment here</p>
-                    <p class="text-xs text-muted-foreground mb-3">PDF files only</p>
+                    <p class="text-xs text-muted-foreground mb-3">PDF, Word (.docx), Excel (.xlsx), or image files</p>
                     <div class="upload-actions">
                       <label for="meetingCreateAttachment" class="btn btn-outline btn-sm cursor-pointer">
                         {{ createAttachmentFiles().length ? 'Add More Files' : 'Choose Files' }}
@@ -285,7 +291,14 @@
                         </button>
                       }
                     </div>
-                    <input id="meetingCreateAttachment" type="file" class="hidden" accept=".pdf,application/pdf" multiple (change)="onCreateAttachmentFileChange($event)">
+                    <input id="meetingCreateAttachment" type="file" class="hidden" accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.gif,.webp" multiple (change)="onCreateAttachmentFileChange($event)">
+                    @if (createAttachmentErrors().length) {
+                      <div class="mt-2 space-y-0.5">
+                        @for (err of createAttachmentErrors(); track err) {
+                          <p class="text-xs text-destructive">{{ err }}</p>
+                        }
+                      </div>
+                    }
                     @if (createAttachmentFiles().length) {
                       <div class="upload-file-list mt-3">
                         @for (item of createAttachmentFiles(); track $index) {
@@ -332,65 +345,6 @@
   (cancelAction)="closeDeleteMeetingConfirm()"
   (confirmAction)="confirmDeleteMeeting()"></app-confirm-modal>
 
-@if (attachmentListTarget(); as target) {
-  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" (click)="closeAttachmentList()">
-    <div class="card w-full max-w-2xl max-h-[85vh] overflow-auto" (click)="$event.stopPropagation()">
-      <div class="card-header">
-        <div>
-          <h4 class="card-title">Meeting Details</h4>
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="closeAttachmentList()" aria-label="Close modal" title="Close">
-          <span aria-hidden="true" class="text-lg leading-none">&times;</span>
-        </button>
-      </div>
-
-      <div class="p-5 space-y-4">
-        <div>
-          <div class="flex flex-wrap items-center gap-2">
-            <h5 class="text-base font-semibold text-foreground">{{ target.title }}</h5>
-            <span [class]="categoryBadgeClass(target.categoryName)">{{ target.categoryName || 'General' }}</span>
-            <span [class]="target.isPublic ? 'badge badge-soft-success' : 'badge badge-soft-secondary'">
-              {{ target.isPublic ? 'Public' : 'Members only' }}
-            </span>
-          </div>
-          @if (target.agenda) {
-            <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{{ target.agenda }}</p>
-          }
-          <p class="mt-3 text-xs text-muted-foreground/70">
-            {{ target.meetingDate }} &middot; {{ target.platform }}
-          </p>
-        </div>
-
-        <div class="border-t border-border/60 pt-4">
-          <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attachments</p>
-          <div class="space-y-3">
-            @if (target.attachments.length) {
-              @for (attachment of target.attachments; track attachment.id) {
-                <div class="upload-file-row">
-                  <p class="text-sm text-foreground font-medium">{{ attachment.fileName }}</p>
-                  <div class="flex items-center gap-2">
-                    <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-view" [disabled]="attachmentActionInProgress()" (click)="openAttachment(attachment)" aria-label="View attachment" title="View">
-                      <app-icon name="eye" [size]="14" />
-                    </button>
-                    @if (target.downloadable) {
-                      <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center btn-icon-download" [disabled]="attachmentActionInProgress()" (click)="downloadAttachment(attachment)" aria-label="Download attachment" title="Download">
-                        <app-icon name="download" [size]="14" />
-                      </button>
-                    }
-                  </div>
-                </div>
-              }
-            } @else {
-              <p class="text-sm text-muted-foreground">No attachments available.</p>
-            }
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-}
-
 <app-attachment-preview
   [open]="previewOpen()"
   [loading]="previewLoading()"
@@ -398,6 +352,7 @@
   [fileName]="previewAttachmentName()"
   [blob]="previewBlob()"
   [downloadable]="previewDownloadable()"
+  (download)="downloadPreviewedAttachment()"
   (closed)="closePreviewModal()" />
 
 @if (showEditModal()) {
@@ -502,8 +457,15 @@
 
                 <div class="form-field-full">
                   <label class="label" for="editMeetingAttachment">Add attachments</label>
-                  <input id="editMeetingAttachment" type="file" class="input" accept=".pdf,application/pdf" multiple (change)="onEditAttachmentFileChange($event)">
-                  <p class="mt-1 text-xs text-muted-foreground">PDF files only</p>
+                  <input id="editMeetingAttachment" type="file" class="input" accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.gif,.webp" multiple (change)="onEditAttachmentFileChange($event)">
+                  <p class="mt-1 text-xs text-muted-foreground">PDF, Word (.docx), Excel (.xlsx), or image files</p>
+                  @if (editAttachmentErrors().length) {
+                    <div class="mt-2 space-y-0.5">
+                      @for (err of editAttachmentErrors(); track err) {
+                        <p class="text-xs text-destructive">{{ err }}</p>
+                      }
+                    </div>
+                  }
                   @if (editAttachmentFiles().length) {
                     <div class="upload-file-list mt-3">
                       @for (item of editAttachmentFiles(); track $index) {
@@ -539,10 +501,6 @@
               </div>
             </section>
           </div>
-
-          @if (editError()) {
-            <p class="text-sm text-destructive">{{ editError() }}</p>
-          }
 
           <div class="flex gap-2">
             <button type="submit" class="btn btn-primary" [disabled]="updating() || categories().length === 0 || editForm.invalid">

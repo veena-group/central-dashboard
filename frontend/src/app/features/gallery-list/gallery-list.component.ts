@@ -58,6 +58,7 @@ export class GalleryListComponent {
   readonly createError = signal<string | null>(null);
   readonly editError = signal<string | null>(null);
   readonly selectedImages = signal<SelectedGalleryImage[]>([]);
+  readonly uploadErrors = signal<string[]>([]);
   readonly uploadDragActive = signal(false);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<GalleryRow[]>([]);
@@ -206,7 +207,6 @@ export class GalleryListComponent {
     if (!images.length) {
       const message = 'Please select an image file.';
       this.createError.set(message);
-      this.toast.warning(message);
       return;
     }
 
@@ -314,7 +314,6 @@ export class GalleryListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update gallery item. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -425,6 +424,7 @@ export class GalleryListComponent {
 
     const next = [...this.selectedImages()];
     const known = new Set(next.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
+    const errors: string[] = [];
 
     for (const file of files) {
       const key = `${file.name}:${file.size}:${file.lastModified}`;
@@ -434,8 +434,7 @@ export class GalleryListComponent {
 
       const validationError = await this.validateImageFile(file);
       if (validationError) {
-        this.createError.set(validationError);
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -449,20 +448,20 @@ export class GalleryListComponent {
       });
     }
 
-    this.createError.set(null);
+    this.uploadErrors.set(errors);
     this.selectedImages.set(next);
   }
 
   private clearSelectedImages(): void {
     this.selectedImages().forEach((item) => URL.revokeObjectURL(item.previewUrl));
     this.selectedImages.set([]);
+    this.uploadErrors.set([]);
   }
 
   private async setEditReplacementImage(file: File): Promise<void> {
     const validationError = await this.validateImageFile(file);
     if (validationError) {
       this.editError.set(validationError);
-      this.toast.warning(`${file.name}: ${validationError}`);
       return;
     }
 

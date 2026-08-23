@@ -27,10 +27,9 @@ export class ProfileComponent implements OnDestroy {
   readonly photoDropActive = signal(false);
   readonly stagedPhotoFile = signal<File | null>(null);
   readonly stagedPhotoPreviewUrl = signal<string | null>(null);
+  readonly photoError = signal<string | null>(null);
 
   readonly submitting = signal(false);
-  readonly successMessage = signal<string | null>(null);
-  readonly errorMessage = signal<string | null>(null);
   readonly showCurrentPassword = signal(false);
   readonly showNewPassword = signal(false);
 
@@ -117,6 +116,7 @@ export class ProfileComponent implements OnDestroy {
   }
 
   openPhotoModal(): void {
+    this.photoError.set(null);
     this.showPhotoModal.set(true);
   }
 
@@ -151,7 +151,7 @@ export class ProfileComponent implements OnDestroy {
   uploadStagedPhoto(): void {
     const file = this.stagedPhotoFile();
     if (!file) {
-      this.toast.warning('Please select a photo first.');
+      this.photoError.set('Please select a photo first.');
       return;
     }
 
@@ -182,6 +182,7 @@ export class ProfileComponent implements OnDestroy {
     this.stagedPhotoFile.set(null);
     this.stagedPhotoPreviewUrl.set(null);
     this.photoDropActive.set(false);
+    this.photoError.set(null);
   }
 
   ngOnDestroy(): void {
@@ -190,12 +191,12 @@ export class ProfileComponent implements OnDestroy {
 
   private stageProfilePhoto(file: File): void {
     if (file.size > 10 * 1024 * 1024) {
-      this.toast.warning('Photo size must be less than 10 MB.');
+      this.photoError.set('Photo size must be less than 10 MB.');
       return;
     }
 
     if (!file.type.startsWith('image/')) {
-      this.toast.warning('Please select an image file.');
+      this.photoError.set('Please select an image file.');
       return;
     }
 
@@ -211,20 +212,16 @@ export class ProfileComponent implements OnDestroy {
     }
 
     this.submitting.set(true);
-    this.successMessage.set(null);
-    this.errorMessage.set(null);
 
     this.api.changePassword(this.passwordForm.getRawValue()).subscribe({
       next: () => {
         this.submitting.set(false);
-        this.successMessage.set('Password changed successfully.');
         this.toast.success('Password changed successfully.');
         this.passwordForm.reset();
       },
       error: (err) => {
         this.submitting.set(false);
         const message = err?.error?.message ?? 'Could not change password';
-        this.errorMessage.set(message);
         this.toast.error(message);
       }
     });

@@ -45,7 +45,7 @@ public class NoticeController {
                                                              @RequestParam(required = false) String search,
                                                              @RequestParam(required = false) Long categoryId,
                                                              @RequestParam(required = false) Boolean isPublic) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.of("Notices fetched successfully",
                 noticeService.list(currentUser.requireSocietyId(), pageable, search, categoryId, isPublic));
     }

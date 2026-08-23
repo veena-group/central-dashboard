@@ -10,7 +10,8 @@ import { AdminContentApiService, AttachmentResponse, CategoryOption } from '../.
 import { NotificationService } from '../../core/services/notification.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { AttachmentPreviewComponent } from '../../shared/attachment-preview/attachment-preview.component';
-import { validatePdfFile } from '../../core/utils/pdf-file-validator';
+import { AttachmentCardComponent } from '../../shared/attachment-card/attachment-card.component';
+import { validateAttachmentFile } from '../../core/utils/attachment-file-validator';
 
 interface FormRow {
   id: number;
@@ -34,7 +35,7 @@ interface SelectedAttachmentFile {
 
 @Component({
   selector: 'app-form-list',
-  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent],
+  imports: [PaginationComponent, ReactiveFormsModule, ConfirmModalComponent, IconComponent, DatePipe, AttachmentPreviewComponent, AttachmentCardComponent],
   templateUrl: './form-list.component.html'
 })
 export class FormListComponent {
@@ -54,12 +55,13 @@ export class FormListComponent {
   readonly createError = signal<string | null>(null);
   readonly editError = signal<string | null>(null);
   readonly createAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly createAttachmentErrors = signal<string[]>([]);
   readonly createAttachmentDragActive = signal(false);
   readonly editAttachments = signal<AttachmentResponse[]>([]);
   readonly editAttachmentFiles = signal<SelectedAttachmentFile[]>([]);
+  readonly editAttachmentErrors = signal<string[]>([]);
   readonly editAttachmentDragActive = signal(false);
   readonly attachmentActionInProgress = signal(false);
-  readonly attachmentListTarget = signal<FormRow | null>(null);
   readonly pendingAttachmentRemovalIds = signal<ReadonlySet<number>>(new Set());
   readonly expandedDescriptionIds = signal<ReadonlySet<number>>(new Set());
   readonly previewOpen = signal(false);
@@ -67,6 +69,8 @@ export class FormListComponent {
   readonly previewError = signal<string | null>(null);
   readonly previewAttachmentName = signal('');
   readonly previewBlob = signal<Blob | null>(null);
+  readonly previewDownloadable = signal(true);
+  readonly previewAttachment = signal<AttachmentResponse | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<FormRow[]>([]);
   readonly page = signal(0);
@@ -121,7 +125,7 @@ export class FormListComponent {
     this.loading.set(true);
     const year = this.toTrimmedString(this.yearControl.value);
     const search = this.toTrimmedString(this.searchControl.value);
-    this.api.list<FormRow>('/admin/forms', page, 5, {
+    this.api.list<FormRow>('/admin/forms', page, 6, {
       search: search || undefined,
       categoryId: this.categoryFilter() || undefined,
       year: year && !Number.isNaN(Number(year)) ? Number(year) : undefined,
@@ -175,6 +179,7 @@ export class FormListComponent {
     this.creating.set(false);
     this.createError.set(null);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
     this.createAttachmentDragActive.set(false);
     this.createForm.reset({
       title: '',
@@ -199,7 +204,6 @@ export class FormListComponent {
     if (parsedYear !== null && Number.isNaN(parsedYear)) {
       const message = 'Year must be a valid number.';
       this.createError.set(message);
-      this.toast.warning(message);
       return;
     }
 
@@ -263,21 +267,11 @@ export class FormListComponent {
     });
     this.editAttachments.set(form.attachments ?? []);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.editAttachmentDragActive.set(false);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.showEditModal.set(true);
     this.loadCategories();
-  }
-
-  openAttachmentList(form: FormRow): void {
-    this.attachmentListTarget.set(form);
-  }
-
-  closeAttachmentList(): void {
-    if (this.attachmentActionInProgress()) {
-      return;
-    }
-    this.attachmentListTarget.set(null);
   }
 
   closeEditModal(): void {
@@ -287,6 +281,7 @@ export class FormListComponent {
     this.editError.set(null);
     this.editAttachments.set([]);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
     this.editAttachmentDragActive.set(false);
     this.pendingAttachmentRemovalIds.set(new Set());
     this.attachmentActionInProgress.set(false);
@@ -317,7 +312,6 @@ export class FormListComponent {
     if (parsedYear !== null && Number.isNaN(parsedYear)) {
       const message = 'Year must be a valid number.';
       this.editError.set(message);
-      this.toast.warning(message);
       return;
     }
 
@@ -351,7 +345,6 @@ export class FormListComponent {
             error: (err: HttpErrorResponse) => {
               this.updating.set(false);
               const message = err.error?.message || 'Form updated, but some attachment changes failed.';
-              this.editError.set(message);
               this.toast.error(message);
               this.load(this.page());
             }
@@ -367,7 +360,6 @@ export class FormListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update form. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -440,6 +432,7 @@ export class FormListComponent {
   clearCreateAttachmentSelection(): void {
     this.createAttachmentDragActive.set(false);
     this.createAttachmentFiles.set([]);
+    this.createAttachmentErrors.set([]);
   }
 
   removeCreateAttachment(index: number): void {
@@ -458,6 +451,7 @@ export class FormListComponent {
   clearEditAttachmentSelection(): void {
     this.editAttachmentDragActive.set(false);
     this.editAttachmentFiles.set([]);
+    this.editAttachmentErrors.set([]);
   }
 
   removeEditAttachment(index: number): void {
@@ -483,12 +477,14 @@ export class FormListComponent {
     this.addEditAttachmentFiles(files);
   }
 
-  openAttachment(attachment: AttachmentResponse): void {
+  openAttachment(form: FormRow, attachment: AttachmentResponse): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
+    this.previewDownloadable.set(form.downloadable);
+    this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
     this.adminApi.fetchStoredFile(attachment.filePath).subscribe({
       next: (blob) => {
@@ -504,8 +500,11 @@ export class FormListComponent {
     });
   }
 
-  previewDownloadable(): boolean {
-    return this.attachmentListTarget()?.downloadable ?? this.editForm.controls.downloadable.value;
+  downloadPreviewedAttachment(): void {
+    const attachment = this.previewAttachment();
+    if (attachment) {
+      this.downloadAttachment(attachment);
+    }
   }
 
   closePreviewModal(): void {
@@ -561,11 +560,12 @@ export class FormListComponent {
     const existing = this.createAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -582,6 +582,7 @@ export class FormListComponent {
       });
     }
 
+    this.createAttachmentErrors.set(errors);
     this.createAttachmentFiles.set(next);
   }
 
@@ -593,11 +594,12 @@ export class FormListComponent {
     const existing = this.editAttachmentFiles();
     const known = new Set(existing.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
     const next = [...existing];
+    const errors: string[] = [];
 
     for (const file of files) {
-      const validationError = validatePdfFile(file);
+      const validationError = validateAttachmentFile(file);
       if (validationError) {
-        this.toast.warning(`${file.name}: ${validationError}`);
+        errors.push(`${file.name}: ${validationError}`);
         continue;
       }
 
@@ -614,6 +616,7 @@ export class FormListComponent {
       });
     }
 
+    this.editAttachmentErrors.set(errors);
     this.editAttachmentFiles.set(next);
   }
 

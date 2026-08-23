@@ -279,7 +279,6 @@ export class MemberListComponent {
       error: (err: HttpErrorResponse) => {
         this.updating.set(false);
         const message = err.error?.message || 'Unable to update member. Please try again.';
-        this.editError.set(message);
         this.toast.error(message);
       }
     });
@@ -380,7 +379,6 @@ export class MemberListComponent {
       this.createPhotoFileType.set('');
       this.createPhotoFileSize.set('');
       this.createPhotoError.set(validationError);
-      this.toast.warning(validationError);
       return;
     }
 

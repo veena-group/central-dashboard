@@ -153,7 +153,7 @@
           <h4 class="card-title">Add Form</h4>
           <p class="text-sm text-muted-foreground">Create a new downloadable form entry</p>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="closeCreateModal()" aria-label="Close modal" title="Close">
+        <button type="button" class="btn btn-ghost btn-sm" [disabled]="creating()" (click)="closeCreateModal()" aria-label="Close modal" title="Close">
           <span aria-hidden="true" class="text-lg leading-none">&times;</span>
         </button>
       </div>
@@ -276,9 +276,11 @@
 
           <div class="flex gap-2">
             <button type="submit" class="btn btn-primary" [disabled]="creating() || categories().length === 0 || createForm.invalid">
-              @if (creating()) { Creating... } @else { Create Form }
+              @if (creating()) {
+                @if (uploadProgress() !== null) { Uploading {{ uploadProgress() }}%... } @else { Creating... }
+              } @else { Create Form }
             </button>
-            <button type="button" class="btn btn-soft-secondary" (click)="closeCreateModal()">Cancel</button>
+            <button type="button" class="btn btn-soft-secondary" [disabled]="creating()" (click)="closeCreateModal()">Cancel</button>
           </div>
         </form>
       </div>
@@ -299,6 +301,7 @@
 <app-attachment-preview
   [open]="previewOpen()"
   [loading]="previewLoading()"
+  [loadingProgress]="previewProgress()"
   [error]="previewError()"
   [fileName]="previewAttachmentName()"
   [blob]="previewBlob()"
@@ -315,7 +318,7 @@
           <h4 class="card-title">Edit Form</h4>
           <p class="text-sm text-muted-foreground">Update form details</p>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="closeEditModal()" aria-label="Close modal" title="Close">
+        <button type="button" class="btn btn-ghost btn-sm" [disabled]="updating()" (click)="closeEditModal()" aria-label="Close modal" title="Close">
           <span aria-hidden="true" class="text-lg leading-none">&times;</span>
         </button>
       </div>
@@ -435,9 +438,11 @@
 
           <div class="flex gap-2">
             <button type="submit" class="btn btn-primary" [disabled]="updating() || categories().length === 0 || editForm.invalid">
-              @if (updating()) { Saving... } @else { Save Changes }
+              @if (updating()) {
+                @if (uploadProgress() !== null) { Uploading {{ uploadProgress() }}%... } @else { Saving... }
+              } @else { Save Changes }
             </button>
-            <button type="button" class="btn btn-soft-secondary" (click)="closeEditModal()">Cancel</button>
+            <button type="button" class="btn btn-soft-secondary" [disabled]="updating()" (click)="closeEditModal()">Cancel</button>
           </div>
         </form>
       </div>

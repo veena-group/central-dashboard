@@ -13,14 +13,20 @@
               <app-icon name="download" [size]="16" />
             </button>
           }
-          <button type="button" class="btn btn-ghost btn-sm" (click)="close()" aria-label="Close preview" title="Close">
+          <button type="button" class="btn btn-ghost btn-sm" [disabled]="loading() || converting()" (click)="close()" aria-label="Close preview" title="Close">
             <span aria-hidden="true" class="text-lg leading-none">&times;</span>
           </button>
         </div>
       </div>
       <div class="p-5">
         @if (loading()) {
-          <div class="text-sm text-muted-foreground">Loading preview...</div>
+          <div class="text-sm text-muted-foreground">
+            @if (loadingProgress() !== null) {
+              Loading preview... {{ loadingProgress() }}%
+            } @else {
+              Loading preview...
+            }
+          </div>
         } @else if (error()) {
           <div class="text-sm text-destructive">{{ error() }}</div>
         } @else if (converting()) {

@@ -47,6 +47,7 @@ export class AttachmentPreviewComponent {
 
   readonly open = input(false);
   readonly loading = input(false);
+  readonly loadingProgress = input<number | null>(null);
   readonly error = input<string | null>(null);
   readonly fileName = input('');
   readonly blob = input<Blob | null>(null);
@@ -78,6 +79,9 @@ export class AttachmentPreviewComponent {
   }
 
   close(): void {
+    if (this.loading() || this.converting()) {
+      return;
+    }
     this.closed.emit();
   }
 

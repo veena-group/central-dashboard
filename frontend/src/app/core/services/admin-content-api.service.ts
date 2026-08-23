@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../models/api-response.model';
@@ -290,6 +290,18 @@ export class AdminContentApiService {
       .pipe(map(() => undefined));
   }
 
+  /** Underlies the uploadXAttachmentWithProgress methods below - surfaces upload progress events. */
+  private uploadFileWithProgress(url: string, file: File): Observable<HttpEvent<ApiResponse<unknown>>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return this.http.post<ApiResponse<unknown>>(url, formData, { reportProgress: true, observe: 'events' });
+  }
+
+  uploadEventAttachmentWithProgress(eventId: number, file: File): Observable<HttpEvent<ApiResponse<unknown>>> {
+    return this.uploadFileWithProgress(`${this.base}/events/${eventId}/attachments`, file);
+  }
+
   uploadEventAttachment(eventId: number, file: File): Observable<void> {
     const formData = new FormData();
     formData.append('file', file);
@@ -358,6 +370,10 @@ export class AdminContentApiService {
       .pipe(map(() => undefined));
   }
 
+  uploadNoticeAttachmentWithProgress(noticeId: number, file: File): Observable<HttpEvent<ApiResponse<unknown>>> {
+    return this.uploadFileWithProgress(`${this.base}/notices/${noticeId}/attachments`, file);
+  }
+
   uploadNoticeAttachment(noticeId: number, file: File): Observable<void> {
     const formData = new FormData();
     formData.append('file', file);
@@ -373,6 +389,10 @@ export class AdminContentApiService {
       .pipe(map(() => undefined));
   }
 
+  uploadDocumentAttachmentWithProgress(documentId: number, file: File): Observable<HttpEvent<ApiResponse<unknown>>> {
+    return this.uploadFileWithProgress(`${this.base}/documents/${documentId}/attachments`, file);
+  }
+
   uploadDocumentAttachment(documentId: number, file: File): Observable<void> {
     const formData = new FormData();
     formData.append('file', file);
@@ -386,6 +406,10 @@ export class AdminContentApiService {
     return this.http
       .delete<ApiResponse<unknown>>(`${this.base}/documents/${documentId}/attachments/${attachmentId}`)
       .pipe(map(() => undefined));
+  }
+
+  uploadFormAttachmentWithProgress(formId: number, file: File): Observable<HttpEvent<ApiResponse<unknown>>> {
+    return this.uploadFileWithProgress(`${this.base}/forms/${formId}/attachments`, file);
   }
 
   uploadFormAttachment(formId: number, file: File): Observable<void> {
@@ -408,6 +432,20 @@ export class AdminContentApiService {
       params: { path: filePath },
       responseType: 'blob'
     });
+  }
+
+  /** Same endpoint as fetchStoredFile, but surfaces download progress events for large attachments. */
+  fetchStoredFileWithProgress(filePath: string): Observable<HttpEvent<Blob>> {
+    return this.http.get(`${environment.apiBaseUrl}/files/view`, {
+      params: { path: filePath },
+      responseType: 'blob',
+      reportProgress: true,
+      observe: 'events'
+    });
+  }
+
+  uploadMeetingAttachmentWithProgress(meetingId: number, file: File): Observable<HttpEvent<ApiResponse<unknown>>> {
+    return this.uploadFileWithProgress(`${this.base}/meetings/${meetingId}/attachments`, file);
   }
 
   uploadMeetingAttachment(meetingId: number, file: File): Observable<void> {

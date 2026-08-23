@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { AbstractControl, FormBuilder, FormControl, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Observable, debounceTime, forkJoin } from 'rxjs';
 import { PagedApiService } from '../../core/services/paged-api.service';
 import { PaginationComponent } from '../../shared/pagination/pagination.component';
@@ -12,6 +12,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { AttachmentPreviewComponent } from '../../shared/attachment-preview/attachment-preview.component';
 import { AttachmentCardComponent } from '../../shared/attachment-card/attachment-card.component';
 import { validateAttachmentFile } from '../../core/utils/attachment-file-validator';
+import { uploadFilesWithAggregateProgress } from '../../core/utils/upload-progress';
 
 interface FormRow {
   id: number;
@@ -71,6 +72,8 @@ export class FormListComponent {
   readonly previewBlob = signal<Blob | null>(null);
   readonly previewDownloadable = signal(true);
   readonly previewAttachment = signal<AttachmentResponse | null>(null);
+  readonly previewProgress = signal<number | null>(null);
+  readonly uploadProgress = signal<number | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly rows = signal<FormRow[]>([]);
   readonly page = signal(0);
@@ -175,8 +178,11 @@ export class FormListComponent {
   }
 
   closeCreateModal(): void {
+    if (this.creating()) {
+      return;
+    }
     this.showCreateModal.set(false);
-    this.creating.set(false);
+    this.uploadProgress.set(null);
     this.createError.set(null);
     this.createAttachmentFiles.set([]);
     this.createAttachmentErrors.set([]);
@@ -221,15 +227,22 @@ export class FormListComponent {
       next: (formId) => {
         const files = this.createAttachmentFiles().map((item) => item.file);
         if (files.length > 0) {
-          forkJoin(files.map((file) => this.adminApi.uploadFormAttachment(formId, file))).subscribe({
+          this.uploadProgress.set(0);
+          forkJoin(uploadFilesWithAggregateProgress(
+            files,
+            (file) => this.adminApi.uploadFormAttachmentWithProgress(formId, file),
+            (percent) => this.uploadProgress.set(percent)
+          )).subscribe({
             next: () => {
               this.creating.set(false);
+              this.uploadProgress.set(null);
               this.toast.success(`Form created with ${files.length} attachment(s) successfully.`);
               this.closeCreateModal();
               this.load(0);
             },
             error: (err: HttpErrorResponse) => {
               this.creating.set(false);
+              this.uploadProgress.set(null);
               const message = err.error?.message || 'Form created, but attachment upload failed.';
               this.createError.set(message);
               this.toast.error(message);
@@ -275,8 +288,11 @@ export class FormListComponent {
   }
 
   closeEditModal(): void {
+    if (this.updating()) {
+      return;
+    }
     this.showEditModal.set(false);
-    this.updating.set(false);
+    this.uploadProgress.set(null);
     this.editingFormId.set(null);
     this.editError.set(null);
     this.editAttachments.set([]);
@@ -329,8 +345,15 @@ export class FormListComponent {
       next: () => {
         const files = this.editAttachmentFiles().map((item) => item.file);
         const removalIds = Array.from(this.pendingAttachmentRemovalIds());
+        if (files.length > 0) {
+          this.uploadProgress.set(0);
+        }
         const operations: Observable<unknown>[] = [
-          ...files.map((file) => this.adminApi.uploadFormAttachment(formId, file)),
+          ...uploadFilesWithAggregateProgress(
+            files,
+            (file) => this.adminApi.uploadFormAttachmentWithProgress(formId, file),
+            (percent) => this.uploadProgress.set(percent)
+          ),
           ...removalIds.map((attachmentId) => this.adminApi.removeFormAttachment(formId, attachmentId))
         ];
 
@@ -338,12 +361,14 @@ export class FormListComponent {
           forkJoin(operations).subscribe({
             next: () => {
               this.updating.set(false);
+              this.uploadProgress.set(null);
               this.toast.success('Form and attachments updated successfully.');
               this.closeEditModal();
               this.load(this.page());
             },
             error: (err: HttpErrorResponse) => {
               this.updating.set(false);
+              this.uploadProgress.set(null);
               const message = err.error?.message || 'Form updated, but some attachment changes failed.';
               this.toast.error(message);
               this.load(this.page());
@@ -480,17 +505,24 @@ export class FormListComponent {
   openAttachment(form: FormRow, attachment: AttachmentResponse): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
+    this.previewProgress.set(null);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
     this.previewDownloadable.set(form.downloadable);
     this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
-    this.adminApi.fetchStoredFile(attachment.filePath).subscribe({
-      next: (blob) => {
-        this.attachmentActionInProgress.set(false);
-        this.previewLoading.set(false);
-        this.previewBlob.set(blob);
+    this.adminApi.fetchStoredFileWithProgress(attachment.filePath).subscribe({
+      next: (event) => {
+        if (event.type === HttpEventType.DownloadProgress) {
+          this.previewProgress.set(event.total ? Math.round((100 * event.loaded) / event.total) : null);
+          return;
+        }
+        if (event.type === HttpEventType.Response && event.body) {
+          this.attachmentActionInProgress.set(false);
+          this.previewLoading.set(false);
+          this.previewBlob.set(event.body);
+        }
       },
       error: () => {
         this.attachmentActionInProgress.set(false);
@@ -510,6 +542,7 @@ export class FormListComponent {
   closePreviewModal(): void {
     this.previewOpen.set(false);
     this.previewLoading.set(false);
+    this.previewProgress.set(null);
     this.previewError.set(null);
     this.previewAttachmentName.set('');
     this.previewBlob.set(null);

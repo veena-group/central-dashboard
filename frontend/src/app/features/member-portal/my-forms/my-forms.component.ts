@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { HttpEventType } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
 import { MemberApiService } from '../../../core/services/member-api.service';
@@ -52,6 +53,7 @@ export class MyFormsComponent {
   readonly previewBlob = signal<Blob | null>(null);
   readonly previewDownloadable = signal(false);
   readonly previewAttachment = signal<AttachmentRow | null>(null);
+  readonly previewProgress = signal<number | null>(null);
   readonly categories = signal<CategoryOption[]>([]);
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly yearControl = new FormControl('', { nonNullable: true });
@@ -111,17 +113,24 @@ export class MyFormsComponent {
   openAttachment(row: FormRow, attachment: AttachmentRow): void {
     this.previewOpen.set(true);
     this.previewLoading.set(true);
+    this.previewProgress.set(null);
     this.previewError.set(null);
     this.previewAttachmentName.set(attachment.fileName || 'Attachment');
     this.previewBlob.set(null);
     this.previewDownloadable.set(row.downloadable);
     this.previewAttachment.set(attachment);
     this.attachmentActionInProgress.set(true);
-    this.api.fetchStoredFile(attachment.filePath).subscribe({
-      next: (blob) => {
-        this.attachmentActionInProgress.set(false);
-        this.previewLoading.set(false);
-        this.previewBlob.set(blob);
+    this.api.fetchStoredFileWithProgress(attachment.filePath).subscribe({
+      next: (event) => {
+        if (event.type === HttpEventType.DownloadProgress) {
+          this.previewProgress.set(event.total ? Math.round((100 * event.loaded) / event.total) : null);
+          return;
+        }
+        if (event.type === HttpEventType.Response && event.body) {
+          this.attachmentActionInProgress.set(false);
+          this.previewLoading.set(false);
+          this.previewBlob.set(event.body);
+        }
       },
       error: () => {
         this.attachmentActionInProgress.set(false);
@@ -141,6 +150,7 @@ export class MyFormsComponent {
   closePreviewModal(): void {
     this.previewOpen.set(false);
     this.previewLoading.set(false);
+    this.previewProgress.set(null);
     this.previewError.set(null);
     this.previewAttachmentName.set('');
     this.previewBlob.set(null);

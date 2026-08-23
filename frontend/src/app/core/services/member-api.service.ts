@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../models/api-response.model';
@@ -50,6 +50,16 @@ export class MemberApiService {
     return this.http.get(`${environment.apiBaseUrl}/files/view`, {
       params: { path: filePath },
       responseType: 'blob'
+    });
+  }
+
+  /** Same endpoint as fetchStoredFile, but surfaces download progress events for large attachments. */
+  fetchStoredFileWithProgress(filePath: string): Observable<HttpEvent<Blob>> {
+    return this.http.get(`${environment.apiBaseUrl}/files/view`, {
+      params: { path: filePath },
+      responseType: 'blob',
+      reportProgress: true,
+      observe: 'events'
     });
   }
 }

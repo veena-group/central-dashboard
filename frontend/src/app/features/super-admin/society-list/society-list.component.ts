@@ -44,6 +44,8 @@ export class SocietyListComponent {
   readonly logoDragActive = signal(false);
   readonly logoError = signal<string | null>(null);
 
+  private passwordManuallyEdited = false;
+
   readonly form = this.fb.nonNullable.group({
     societyName: ['', [Validators.required]],
     domain: ['', [Validators.required]],
@@ -54,7 +56,7 @@ export class SocietyListComponent {
     adminName: ['', [Validators.required]],
     adminEmail: ['', [Validators.required, Validators.email]],
     adminPhone: [''],
-    adminPassword: ['', [Validators.required]],
+    adminPassword: ['', [Validators.required, Validators.minLength(4)]],
     features: this.fb.array(
       this.featureKeys.map((key) =>
         this.fb.nonNullable.group(
@@ -91,7 +93,12 @@ export class SocietyListComponent {
 
     this.searchControl.valueChanges.pipe(debounceTime(300)).subscribe(() => this.load(0));
     this.form.controls.adminName.valueChanges.subscribe((name) => {
-      this.form.controls.adminPassword.setValue(generateMemberPassword(name), { emitEvent: false });
+      if (!this.passwordManuallyEdited) {
+        this.form.controls.adminPassword.setValue(generateMemberPassword(name), { emitEvent: false });
+      }
+    });
+    this.form.controls.adminPassword.valueChanges.subscribe(() => {
+      this.passwordManuallyEdited = true;
     });
   }
 
@@ -166,7 +173,8 @@ export class SocietyListComponent {
 
   openAddModal(): void {
     this.createError.set(null);
-    this.form.controls.adminPassword.setValue(generateMemberPassword(this.form.controls.adminName.value));
+    this.passwordManuallyEdited = false;
+    this.form.controls.adminPassword.setValue(generateMemberPassword(this.form.controls.adminName.value), { emitEvent: false });
     this.showAddModal.set(true);
   }
 

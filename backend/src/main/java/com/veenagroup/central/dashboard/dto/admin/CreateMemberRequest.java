@@ -14,6 +14,6 @@ public record CreateMemberRequest(
         @NotBlank @Email String email,
         @Pattern(regexp = "^$|^[6-9]\\d{9}$", message = "Phone number must be a valid 10-digit Indian mobile number") String phone,
         @NotNull Role role,
-        @NotBlank @Size(min = 6, max = 100) String password
+        @NotBlank @Size(min = 4, max = 100) String password
 ) {
 }

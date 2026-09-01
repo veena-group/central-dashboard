@@ -124,7 +124,14 @@
                           [disabled]="submitted()"
                           (change)="updateRowField(row.rowNumber, 'phone', $any($event.target).value)">
                       </td>
-                      <td class="font-mono text-xs whitespace-nowrap">{{ row.password || '—' }}</td>
+                      <td>
+                        <input
+                          type="text"
+                          class="input !h-9 !py-1 text-sm font-mono min-w-[130px]"
+                          [value]="row.password"
+                          [disabled]="submitted()"
+                          (change)="updateRowField(row.rowNumber, 'password', $any($event.target).value)">
+                      </td>
                       <td>
                         @switch (row.status) {
                           @case ('ready') {

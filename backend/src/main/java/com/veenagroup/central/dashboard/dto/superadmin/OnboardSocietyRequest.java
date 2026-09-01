@@ -21,7 +21,7 @@ public record OnboardSocietyRequest(
         @NotBlank String adminName,
         @NotBlank @Email String adminEmail,
         String adminPhone,
-        @NotBlank @Size(min = 6, max = 100) String adminPassword,
+        @NotBlank @Size(min = 4, max = 100) String adminPassword,
 
         @NotEmpty List<@Valid FeatureConfigRequest> features
 ) {

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { debounceTime } from 'rxjs';
@@ -43,6 +43,9 @@ export class CommitteeListComponent {
   readonly updating = signal(false);
   readonly deletingCommitteeId = signal<number | null>(null);
   readonly committeePendingDelete = signal<CommitteeRow | null>(null);
+  readonly selectedIds = signal<Set<number>>(new Set());
+  readonly showBulkDeleteConfirm = signal(false);
+  readonly bulkDeleting = signal(false);
   readonly createError = signal<string | null>(null);
   readonly editError = signal<string | null>(null);
   readonly createPhotoError = signal<string | null>(null);
@@ -58,6 +61,12 @@ export class CommitteeListComponent {
   readonly last = signal(true);
   readonly editingCommitteeId = signal<number | null>(null);
   readonly searchControl = new FormControl('', { nonNullable: true });
+
+  readonly selectedCount = computed(() => this.selectedIds().size);
+  readonly allSelected = computed(() => {
+    const rows = this.rows();
+    return rows.length > 0 && rows.every((row) => this.selectedIds().has(row.id));
+  });
 
   private selectedCreatePhotoFile: File | null = null;
 
@@ -86,6 +95,7 @@ export class CommitteeListComponent {
 
   load(page: number): void {
     this.loading.set(true);
+    this.selectedIds.set(new Set());
     this.api.list<CommitteeRow>('/admin/committee', page, 10, {
       search: this.searchControl.value.trim() || undefined
     }).subscribe({
@@ -99,6 +109,32 @@ export class CommitteeListComponent {
       },
       error: () => this.loading.set(false)
     });
+  }
+
+  isSelected(committeeId: number): boolean {
+    return this.selectedIds().has(committeeId);
+  }
+
+  toggleSelect(member: CommitteeRow): void {
+    const next = new Set(this.selectedIds());
+    if (next.has(member.id)) {
+      next.delete(member.id);
+    } else {
+      next.add(member.id);
+    }
+    this.selectedIds.set(next);
+  }
+
+  toggleSelectAll(): void {
+    if (this.allSelected()) {
+      this.selectedIds.set(new Set());
+      return;
+    }
+    this.selectedIds.set(new Set(this.rows().map((row) => row.id)));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
   }
 
   hasActiveFilters(): boolean {
@@ -290,6 +326,48 @@ export class CommitteeListComponent {
         this.deletingCommitteeId.set(null);
         this.committeePendingDelete.set(null);
         const message = err.error?.message || 'Unable to remove committee member. Please try again.';
+        this.toast.error(message);
+      }
+    });
+  }
+
+  requestBulkDelete(): void {
+    if (this.selectedCount() === 0) {
+      return;
+    }
+    this.showBulkDeleteConfirm.set(true);
+  }
+
+  closeBulkDeleteConfirm(): void {
+    if (this.bulkDeleting()) {
+      return;
+    }
+    this.showBulkDeleteConfirm.set(false);
+  }
+
+  confirmBulkDelete(): void {
+    const ids = Array.from(this.selectedIds());
+    if (ids.length === 0) {
+      return;
+    }
+
+    this.bulkDeleting.set(true);
+    this.adminApi.deleteCommitteeMembersBulk(ids).subscribe({
+      next: (result) => {
+        this.bulkDeleting.set(false);
+        this.showBulkDeleteConfirm.set(false);
+        if (result.failureCount === 0) {
+          this.toast.success(`${result.successCount} committee member(s) removed successfully.`);
+        } else {
+          this.toast.error(`${result.successCount} removed, ${result.failureCount} could not be removed.`);
+        }
+        const currentPage = this.page();
+        const shouldMoveBack = result.successCount >= this.rows().length && currentPage > 0;
+        this.load(shouldMoveBack ? currentPage - 1 : currentPage);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.bulkDeleting.set(false);
+        const message = err.error?.message || 'Unable to remove selected committee members. Please try again.';
         this.toast.error(message);
       }
     });

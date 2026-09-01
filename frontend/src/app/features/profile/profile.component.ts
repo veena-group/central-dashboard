@@ -42,7 +42,7 @@ export class ProfileComponent implements OnDestroy {
 
   readonly passwordForm = this.fb.nonNullable.group({
     currentPassword: ['', [Validators.required]],
-    newPassword: ['', [Validators.required, Validators.minLength(8)]]
+    newPassword: ['', [Validators.required, Validators.minLength(4)]]
   });
 
   constructor() {

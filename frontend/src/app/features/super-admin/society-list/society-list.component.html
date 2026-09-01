@@ -210,9 +210,13 @@
                   <input id="adminPhone" type="text" class="input" formControlName="adminPhone" placeholder="e.g. 9876543210">
                 </div>
                 <div>
-                  <label class="label" for="adminPassword">Admin Password (auto-generated)</label>
-                  <input id="adminPassword" type="text" class="input" formControlName="adminPassword" readonly>
-                  <p class="mt-1 text-xs text-muted-foreground">Generated from the admin's first name (FirstName@123). Share this with the admin so they can sign in and change it later.</p>
+                  <label class="label" for="adminPassword">Admin Password</label>
+                  <input id="adminPassword" type="text" class="input" formControlName="adminPassword">
+                  @if (form.controls.adminPassword.invalid && form.controls.adminPassword.touched) {
+                    <p class="mt-1 text-xs text-destructive">Password must be at least 4 characters.</p>
+                  } @else {
+                    <p class="mt-1 text-xs text-muted-foreground">Auto-generated from the admin's first name (FirstName@123) &mdash; edit if you want to set a different one. Share it with the admin so they can sign in and change it later.</p>
+                  }
                 </div>
               </div>
             </section>

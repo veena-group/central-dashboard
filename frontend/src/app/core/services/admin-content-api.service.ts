@@ -38,6 +38,19 @@ export interface BulkCreateMembersResponse {
   results: BulkMemberRowResult[];
 }
 
+export interface BulkDeleteResult {
+  id: number;
+  success: boolean;
+  message: string;
+}
+
+export interface BulkDeleteResponse {
+  totalRequested: number;
+  successCount: number;
+  failureCount: number;
+  results: BulkDeleteResult[];
+}
+
 export interface CreateNoticeRequest {
   title: string;
   body: string | null;
@@ -173,6 +186,12 @@ export class AdminContentApiService {
       .pipe(map(() => undefined));
   }
 
+  deleteMembersBulk(memberIds: number[]): Observable<BulkDeleteResponse> {
+    return this.http
+      .post<ApiResponse<BulkDeleteResponse>>(`${this.base}/members/bulk-delete`, { ids: memberIds })
+      .pipe(map((response) => response.data));
+  }
+
   createNotice(request: CreateNoticeRequest): Observable<number> {
     return this.http
       .post<ApiResponse<CreatedEntityResponse>>(`${this.base}/notices`, request)
@@ -243,6 +262,12 @@ export class AdminContentApiService {
     return this.http
       .delete<ApiResponse<void>>(`${this.base}/committee/${committeeId}`)
       .pipe(map(() => undefined));
+  }
+
+  deleteCommitteeMembersBulk(committeeIds: number[]): Observable<BulkDeleteResponse> {
+    return this.http
+      .post<ApiResponse<BulkDeleteResponse>>(`${this.base}/committee/bulk-delete`, { ids: committeeIds })
+      .pipe(map((response) => response.data));
   }
 
   createMeeting(request: CreateMeetingRequest): Observable<number> {

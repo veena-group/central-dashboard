@@ -1,5 +1,6 @@
 package com.veenagroup.central.dashboard.service;
 
+import com.veenagroup.central.dashboard.dto.admin.BulkDeleteResult;
 import com.veenagroup.central.dashboard.dto.admin.CommitteeRequest;
 import com.veenagroup.central.dashboard.dto.admin.CommitteeResponse;
 import com.veenagroup.central.dashboard.entity.Committee;
@@ -122,6 +123,17 @@ public class CommitteeService {
         }
         committeeRepository.delete(committee);
         log.info("Deleted committee member {} for society {}", committeeId, societyId);
+    }
+
+    @Transactional
+    public BulkDeleteResult deleteOneForBulk(Long societyId, Long committeeId) {
+        Committee committee = findOwned(societyId, committeeId);
+        if (committee.getPhotoUrl() != null) {
+            fileStorageService.deleteAfterCommit(committee.getPhotoUrl());
+        }
+        committeeRepository.delete(committee);
+        log.info("Bulk-deleted committee member {} for society {}", committeeId, societyId);
+        return new BulkDeleteResult(committeeId, true, "Committee member deleted successfully");
     }
 
     private Committee findOwned(Long societyId, Long committeeId) {

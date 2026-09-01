@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { debounceTime } from 'rxjs';
@@ -47,6 +47,9 @@ export class MemberListComponent {
   readonly updating = signal(false);
   readonly deletingMemberId = signal<number | null>(null);
   readonly memberPendingDelete = signal<MemberRow | null>(null);
+  readonly selectedIds = signal<Set<number>>(new Set());
+  readonly showBulkDeleteConfirm = signal(false);
+  readonly bulkDeleting = signal(false);
   readonly createError = signal<string | null>(null);
   readonly editError = signal<string | null>(null);
   readonly createPhotoError = signal<string | null>(null);
@@ -65,7 +68,15 @@ export class MemberListComponent {
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly roleFilter = signal('');
 
+  readonly selectableRows = computed(() => this.rows().filter((row) => row.role !== 'SOCIETY_ADMIN'));
+  readonly selectedCount = computed(() => this.selectedIds().size);
+  readonly allSelectableSelected = computed(() => {
+    const selectable = this.selectableRows();
+    return selectable.length > 0 && selectable.every((row) => this.selectedIds().has(row.id));
+  });
+
   private selectedCreatePhotoFile: File | null = null;
+  private passwordManuallyEdited = false;
 
   readonly createForm = this.fb.nonNullable.group({
     name: ['', [Validators.required]],
@@ -74,7 +85,7 @@ export class MemberListComponent {
     email: ['', [Validators.required, Validators.email]],
     phone: ['', [phoneNumberValidator()]],
     role: ['MEMBER' as 'MEMBER' | 'SOCIETY_ADMIN', [Validators.required]],
-    password: ['', [Validators.required]]
+    password: ['', [Validators.required, Validators.minLength(4)]]
   });
 
   readonly editForm = this.fb.nonNullable.group({
@@ -89,12 +100,18 @@ export class MemberListComponent {
     this.load(0);
     this.searchControl.valueChanges.pipe(debounceTime(300)).subscribe(() => this.load(0));
     this.createForm.controls.name.valueChanges.subscribe((name) => {
-      this.createForm.controls.password.setValue(generateMemberPassword(name), { emitEvent: false });
+      if (!this.passwordManuallyEdited) {
+        this.createForm.controls.password.setValue(generateMemberPassword(name), { emitEvent: false });
+      }
+    });
+    this.createForm.controls.password.valueChanges.subscribe(() => {
+      this.passwordManuallyEdited = true;
     });
   }
 
   load(page: number): void {
     this.loading.set(true);
+    this.selectedIds.set(new Set());
     this.api.list<MemberRow>('/admin/members', page, 10, {
       search: this.searchControl.value.trim() || undefined,
       role: this.roleFilter() || undefined
@@ -109,6 +126,35 @@ export class MemberListComponent {
       },
       error: () => this.loading.set(false)
     });
+  }
+
+  isSelected(memberId: number): boolean {
+    return this.selectedIds().has(memberId);
+  }
+
+  toggleSelect(member: MemberRow): void {
+    if (member.role === 'SOCIETY_ADMIN') {
+      return;
+    }
+    const next = new Set(this.selectedIds());
+    if (next.has(member.id)) {
+      next.delete(member.id);
+    } else {
+      next.add(member.id);
+    }
+    this.selectedIds.set(next);
+  }
+
+  toggleSelectAll(): void {
+    if (this.allSelectableSelected()) {
+      this.selectedIds.set(new Set());
+      return;
+    }
+    this.selectedIds.set(new Set(this.selectableRows().map((row) => row.id)));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
   }
 
   setRoleFilter(value: string): void {
@@ -128,7 +174,8 @@ export class MemberListComponent {
 
   openCreateModal(): void {
     this.createError.set(null);
-    this.createForm.controls.password.setValue(generateMemberPassword(this.createForm.controls.name.value));
+    this.passwordManuallyEdited = false;
+    this.createForm.controls.password.setValue(generateMemberPassword(this.createForm.controls.name.value), { emitEvent: false });
     this.showCreateModal.set(true);
   }
 
@@ -319,6 +366,48 @@ export class MemberListComponent {
         this.deletingMemberId.set(null);
         this.memberPendingDelete.set(null);
         const message = err.error?.message || 'Unable to remove member. Please try again.';
+        this.toast.error(message);
+      }
+    });
+  }
+
+  requestBulkDelete(): void {
+    if (this.selectedCount() === 0) {
+      return;
+    }
+    this.showBulkDeleteConfirm.set(true);
+  }
+
+  closeBulkDeleteConfirm(): void {
+    if (this.bulkDeleting()) {
+      return;
+    }
+    this.showBulkDeleteConfirm.set(false);
+  }
+
+  confirmBulkDelete(): void {
+    const ids = Array.from(this.selectedIds());
+    if (ids.length === 0) {
+      return;
+    }
+
+    this.bulkDeleting.set(true);
+    this.adminApi.deleteMembersBulk(ids).subscribe({
+      next: (result) => {
+        this.bulkDeleting.set(false);
+        this.showBulkDeleteConfirm.set(false);
+        if (result.failureCount === 0) {
+          this.toast.success(`${result.successCount} member(s) removed successfully.`);
+        } else {
+          this.toast.error(`${result.successCount} member(s) removed, ${result.failureCount} could not be removed.`);
+        }
+        const currentPage = this.page();
+        const shouldMoveBack = result.successCount >= this.rows().length && currentPage > 0;
+        this.load(shouldMoveBack ? currentPage - 1 : currentPage);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.bulkDeleting.set(false);
+        const message = err.error?.message || 'Unable to remove selected members. Please try again.';
         this.toast.error(message);
       }
     });

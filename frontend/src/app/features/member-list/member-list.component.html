@@ -5,6 +5,11 @@
       <p class="text-sm text-muted-foreground">All residents registered in your society</p>
     </div>
     <div class="flex shrink-0 items-center gap-2">
+      @if (selectedCount() > 0) {
+        <button type="button" class="btn btn-destructive btn-sm" (click)="requestBulkDelete()">
+          Delete Selected ({{ selectedCount() }})
+        </button>
+      }
       <button type="button" class="btn btn-outline btn-sm" (click)="openBulkUploadModal()">Bulk Upload</button>
       <button type="button" class="btn btn-primary btn-sm" (click)="openCreateModal()">+ Add Member</button>
     </div>
@@ -37,6 +42,15 @@
     <table class="table-base">
       <thead>
         <tr>
+          <th class="w-10">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-input text-primary focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              [checked]="allSelectableSelected()"
+              [disabled]="selectableRows().length === 0"
+              (change)="toggleSelectAll()"
+              aria-label="Select all members on this page">
+          </th>
           <th>Member</th>
           <th>Role</th>
           <th>Wing / Flat</th>
@@ -48,6 +62,16 @@
       <tbody>
         @for (member of rows(); track member.id) {
           <tr>
+            <td>
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-input text-primary focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                [checked]="isSelected(member.id)"
+                [disabled]="member.role === 'SOCIETY_ADMIN'"
+                [title]="member.role === 'SOCIETY_ADMIN' ? 'Society admins cannot be bulk deleted' : ''"
+                (change)="toggleSelect(member)"
+                [attr.aria-label]="'Select ' + member.name">
+            </td>
             <td>
               <div class="flex items-center gap-3">
                 <app-avatar [name]="member.name" [imageUrl]="member.photoUrl" size="sm" />
@@ -79,6 +103,7 @@
           @if (loading()) {
             @for (i of [1,2,3,4,5]; track i) {
               <tr>
+                <td></td>
                 <td>
                   <div class="flex items-center gap-3">
                     <div class="skeleton h-8 w-8 rounded-full"></div>
@@ -94,7 +119,7 @@
             }
           } @else if (hasActiveFilters()) {
             <tr>
-              <td colspan="6" class="py-8 text-center">
+              <td colspan="7" class="py-8 text-center">
                 <h5 class="text-base font-semibold text-foreground">No members match your filters</h5>
                 <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Try a different search term or clear the filters.</p>
                 <button type="button" class="btn btn-soft-secondary btn-sm mt-4" (click)="clearFilters()">Clear Filters</button>
@@ -102,7 +127,7 @@
             </tr>
           } @else {
             <tr>
-              <td colspan="6" class="py-8 text-center">
+              <td colspan="7" class="py-8 text-center">
                 <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
                   <app-icon name="members" [size]="22" />
                 </div>
@@ -194,9 +219,13 @@
               <div class="form-section-heading">Account Access</div>
               <div class="form-section-fields">
                 <div class="form-field-full">
-                  <label class="label" for="memberPassword">Password (auto-generated)</label>
-                  <input id="memberPassword" type="text" class="input" formControlName="password" readonly>
-                  <p class="mt-1 text-xs text-muted-foreground">Generated from the member's first name (FirstName@123). Share this with the member so they can sign in and change it later.</p>
+                  <label class="label" for="memberPassword">Password</label>
+                  <input id="memberPassword" type="text" class="input" formControlName="password">
+                  @if (createForm.controls.password.invalid && createForm.controls.password.touched) {
+                    <p class="mt-1 text-xs text-destructive">Password must be at least 4 characters.</p>
+                  } @else {
+                    <p class="mt-1 text-xs text-muted-foreground">Auto-generated from the member's first name (FirstName@123) &mdash; edit if you want to set a different one. Share it with the member so they can sign in and change it later.</p>
+                  }
                 </div>
               </div>
             </section>
@@ -274,6 +303,16 @@
   [confirming]="!!deletingMemberId()"
   (cancelAction)="closeDeleteMemberConfirm()"
   (confirmAction)="confirmDeleteMember()"></app-confirm-modal>
+
+<app-confirm-modal
+  [open]="showBulkDeleteConfirm()"
+  title="Remove Selected Members"
+  [message]="'Remove ' + selectedCount() + ' selected member(s)? Portal access will be revoked and this cannot be undone.'"
+  confirmLabel="Remove"
+  cancelLabel="Cancel"
+  [confirming]="bulkDeleting()"
+  (cancelAction)="closeBulkDeleteConfirm()"
+  (confirmAction)="confirmBulkDelete()"></app-confirm-modal>
 
 @if (showEditModal()) {
   <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"></div>

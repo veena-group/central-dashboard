@@ -1,5 +1,6 @@
 package com.veenagroup.central.dashboard.service;
 
+import com.veenagroup.central.dashboard.dto.admin.BulkDeleteResult;
 import com.veenagroup.central.dashboard.dto.admin.CreateMemberRequest;
 import com.veenagroup.central.dashboard.dto.admin.MemberResponse;
 import com.veenagroup.central.dashboard.dto.admin.UpdateMemberRequest;
@@ -170,6 +171,20 @@ public class MemberService {
 
         usersRepository.delete(user);
         log.info("Deleted member {} for society {}", memberId, societyId);
+    }
+
+    @Transactional
+    public BulkDeleteResult deleteOneForBulk(Long societyId, Long memberId) {
+        Users user = findOwned(societyId, memberId);
+
+        // Bulk delete is restricted to non-admin rows; admins must be removed individually.
+        if (user.getRole() == Role.SOCIETY_ADMIN) {
+            return new BulkDeleteResult(memberId, false, "Society admins cannot be bulk deleted");
+        }
+
+        usersRepository.delete(user);
+        log.info("Bulk-deleted member {} for society {}", memberId, societyId);
+        return new BulkDeleteResult(memberId, true, "Member deleted successfully");
     }
 
     private boolean isLastSocietyAdmin(Long societyId) {

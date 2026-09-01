@@ -12,7 +12,7 @@ import { isValidPhoneNumber } from '../../../core/utils/phone-validator';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 
 type RowStatus = 'invalid' | 'ready' | 'success' | 'failed';
-type EditableField = 'name' | 'email' | 'flat' | 'wing' | 'phone';
+type EditableField = 'name' | 'email' | 'flat' | 'wing' | 'phone' | 'password';
 
 interface ParsedRow {
   rowNumber: number;
@@ -21,10 +21,14 @@ interface ParsedRow {
   flat: string | null;
   wing: string | null;
   phone: string | null;
+  /** Password typed in the file's Password column, if any. Empty means auto-generate from the name. */
+  rawPassword: string;
   password: string;
   status: RowStatus;
   statusMessage: string | null;
 }
+
+const MIN_PASSWORD_LENGTH = 4;
 
 const MAX_ROWS = 500;
 const PREVIEW_PAGE_SIZE = 10;
@@ -91,7 +95,7 @@ export class BulkMemberUploadModalComponent {
   async downloadTemplate(): Promise<void> {
     const { utils, writeFile } = await import('xlsx');
     const worksheet = utils.json_to_sheet([
-      { Name: 'Rohan Sharma', Email: 'rohan.sharma@example.com', Flat: '302', Wing: 'A', Phone: '9876543210' }
+      { Name: 'Rohan Sharma', Email: 'rohan.sharma@example.com', Flat: '302', Wing: 'A', Phone: '9876543210', Password: '' }
     ]);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, 'Members');
@@ -144,6 +148,8 @@ export class BulkMemberUploadModalComponent {
             return { ...row, wing: rawValue.trim() || null };
           case 'phone':
             return { ...row, phone: rawValue.trim() || null };
+          case 'password':
+            return { ...row, rawPassword: rawValue.trim() };
         }
       })
     );
@@ -290,6 +296,7 @@ export class BulkMemberUploadModalComponent {
         flat: this.textValue(lookup, 'flat') || null,
         wing: this.textValue(lookup, 'wing') || null,
         phone: this.textValue(lookup, 'phone') || null,
+        rawPassword: this.textValue(lookup, 'password'),
         password: '',
         status: 'ready',
         statusMessage: null
@@ -323,9 +330,13 @@ export class BulkMemberUploadModalComponent {
       errors.push('Phone must be a valid 10-digit Indian mobile number');
     }
 
+    if (row.rawPassword && row.rawPassword.length < MIN_PASSWORD_LENGTH) {
+      errors.push(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    }
+
     return {
       ...row,
-      password: name ? generateMemberPassword(name) : '',
+      password: row.rawPassword || (name ? generateMemberPassword(name) : ''),
       status: errors.length > 0 ? 'invalid' : 'ready',
       statusMessage: errors.length > 0 ? errors.join('; ') : null
     };

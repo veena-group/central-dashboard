@@ -2,6 +2,9 @@ package com.veenagroup.central.dashboard.controller;
 
 import com.veenagroup.central.dashboard.dto.admin.BulkCreateMembersRequest;
 import com.veenagroup.central.dashboard.dto.admin.BulkCreateMembersResponse;
+import com.veenagroup.central.dashboard.dto.admin.BulkDeleteRequest;
+import com.veenagroup.central.dashboard.dto.admin.BulkDeleteResponse;
+import com.veenagroup.central.dashboard.dto.admin.BulkDeleteResult;
 import com.veenagroup.central.dashboard.dto.admin.BulkMemberRowResult;
 import com.veenagroup.central.dashboard.dto.admin.CheckEmailsRequest;
 import com.veenagroup.central.dashboard.dto.admin.CheckEmailsResponse;
@@ -125,5 +128,31 @@ public class MemberController {
         log.info("Deleting member {} for society {}", memberId, currentUser.requireSocietyId());
         memberService.delete(currentUser.requireSocietyId(), memberId);
         return ResponseEntity.ok(ApiResponse.of("Member deleted successfully", null));
+    }
+
+    @PostMapping("/bulk-delete")
+    public ApiResponse<BulkDeleteResponse> bulkDelete(@Valid @RequestBody BulkDeleteRequest request) {
+        Long societyId = currentUser.requireSocietyId();
+        List<Long> ids = request.ids();
+        log.info("Bulk-deleting {} members for society {}", ids.size(), societyId);
+
+        List<BulkDeleteResult> results = new ArrayList<>(ids.size());
+        int successCount = 0;
+
+        for (Long memberId : ids) {
+            try {
+                BulkDeleteResult result = memberService.deleteOneForBulk(societyId, memberId);
+                results.add(result);
+                if (result.success()) {
+                    successCount++;
+                }
+            } catch (BusinessException e) {
+                results.add(new BulkDeleteResult(memberId, false, e.getMessage()));
+            }
+        }
+
+        BulkDeleteResponse response = new BulkDeleteResponse(ids.size(), successCount, ids.size() - successCount, results);
+        log.info("Bulk member delete for society {}: {} succeeded, {} failed", societyId, successCount, response.failureCount());
+        return ApiResponse.of("Bulk delete completed: %d of %d members deleted".formatted(successCount, ids.size()), response);
     }
 }

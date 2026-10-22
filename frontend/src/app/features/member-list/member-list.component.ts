@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { debounceTime } from 'rxjs';
@@ -11,6 +11,9 @@ import { NotificationService } from '../../core/services/notification.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { generateMemberPassword } from '../../core/utils/password-generator';
 import { phoneNumberValidator } from '../../core/utils/phone-validator';
+import { AuthService } from '../../core/services/auth.service';
+import { ProfileApiService } from '../../core/services/profile-api.service';
+import { LoginType } from '../../core/models/auth.model';
 import { BulkMemberUploadModalComponent } from './bulk-member-upload-modal/bulk-member-upload-modal.component';
 
 interface MemberRow {
@@ -18,7 +21,7 @@ interface MemberRow {
   name: string;
   flat: string;
   wing: string;
-  email: string;
+  email: string | null;
   phone: string;
   role: string;
   photoUrl: string | null;
@@ -38,6 +41,12 @@ export class MemberListComponent {
   private readonly adminApi = inject(AdminContentApiService);
   private readonly fb = inject(FormBuilder);
   private readonly toast = inject(NotificationService);
+  private readonly auth = inject(AuthService);
+  private readonly profileApi = inject(ProfileApiService);
+
+  /** How this society's members sign in; decides which of email / phone is mandatory. */
+  readonly loginType = computed<LoginType>(() => this.auth.currentUser()?.loginType ?? 'EMAIL');
+  readonly isMobileLogin = computed(() => this.loginType() === 'MOBILE');
 
   readonly loading = signal(true);
   readonly showCreateModal = signal(false);
@@ -97,6 +106,12 @@ export class MemberListComponent {
   });
 
   constructor() {
+    // The super admin can change the login type while an admin is signed in, so don't trust the value cached at login.
+    this.profileApi.getMyProfile().subscribe({
+      next: (profile) => this.auth.syncCurrentUserFromProfile(profile),
+      error: () => {}
+    });
+    effect(() => this.applyLoginTypeValidators(this.isMobileLogin()));
     this.load(0);
     this.searchControl.valueChanges.pipe(debounceTime(300)).subscribe(() => this.load(0));
     this.createForm.controls.name.valueChanges.subscribe((name) => {
@@ -213,6 +228,22 @@ export class MemberListComponent {
     });
   }
 
+  private applyLoginTypeValidators(mobileLogin: boolean): void {
+    const phone = mobileLogin ? [Validators.required, phoneNumberValidator()] : [phoneNumberValidator()];
+    const email = mobileLogin ? [Validators.email] : [Validators.required, Validators.email];
+
+    this.createForm.controls.email.setValidators(email);
+    this.createForm.controls.phone.setValidators(phone);
+    this.editForm.controls.phone.setValidators(phone);
+    this.createForm.controls.email.updateValueAndValidity();
+    this.createForm.controls.phone.updateValueAndValidity();
+    this.editForm.controls.phone.updateValueAndValidity();
+  }
+
+  private static cleanPhone(value: string): string | null {
+    return value.replace(/[\s-]/g, '') || null;
+  }
+
   createMember(): void {
     if (this.createForm.invalid) {
       this.createForm.markAllAsTouched();
@@ -227,8 +258,8 @@ export class MemberListComponent {
       name: value.name,
       flat: value.flat.trim() || null,
       wing: value.wing.trim() || null,
-      email: value.email,
-      phone: value.phone.trim() || null,
+      email: value.email.trim() || null,
+      phone: MemberListComponent.cleanPhone(value.phone),
       role: value.role,
       password: value.password
     }).subscribe({
@@ -314,7 +345,7 @@ export class MemberListComponent {
       name: value.name,
       flat: value.flat.trim() || null,
       wing: value.wing.trim() || null,
-      phone: value.phone.trim() || null,
+      phone: MemberListComponent.cleanPhone(value.phone),
       role: value.role
     }).subscribe({
       next: () => {

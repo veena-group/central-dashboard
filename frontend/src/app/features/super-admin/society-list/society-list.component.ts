@@ -3,7 +3,8 @@ import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angu
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { debounceTime } from 'rxjs';
 import { SuperAdminApiService } from '../../../core/services/super-admin-api.service';
-import { SocietyResponse, FEATURE_KEYS } from '../../../core/models/super-admin.model';
+import { SocietyResponse, FEATURE_KEYS, LoginType } from '../../../core/models/super-admin.model';
+import { phoneNumberValidator } from '../../../core/utils/phone-validator';
 import { featureLimitValidator } from '../../../core/validators/feature-limit.validator';
 import { NotificationService } from '../../../core/services/notification.service';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
@@ -53,9 +54,10 @@ export class SocietyListComponent {
     secondaryColor: ['#F59E0B'],
     domainStartDate: ['', [Validators.required]],
     domainExpiryDate: ['', [Validators.required]],
+    loginType: this.fb.nonNullable.control<LoginType>('EMAIL'),
     adminName: ['', [Validators.required]],
     adminEmail: ['', [Validators.required, Validators.email]],
-    adminPhone: [''],
+    adminPhone: ['', [phoneNumberValidator()]],
     adminPassword: ['', [Validators.required, Validators.minLength(4)]],
     features: this.fb.array(
       this.featureKeys.map((key) =>
@@ -92,6 +94,7 @@ export class SocietyListComponent {
     this.load(0);
 
     this.searchControl.valueChanges.pipe(debounceTime(300)).subscribe(() => this.load(0));
+    this.form.controls.loginType.valueChanges.subscribe((type) => this.applyAdminLoginValidators(type));
     this.form.controls.adminName.valueChanges.subscribe((name) => {
       if (!this.passwordManuallyEdited) {
         this.form.controls.adminPassword.setValue(generateMemberPassword(name), { emitEvent: false });
@@ -100,6 +103,24 @@ export class SocietyListComponent {
     this.form.controls.adminPassword.valueChanges.subscribe(() => {
       this.passwordManuallyEdited = true;
     });
+  }
+
+  get isMobileLogin(): boolean {
+    return this.form.controls.loginType.value === 'MOBILE';
+  }
+
+  /** Whichever identifier the society signs in with is mandatory for the first admin; the other is optional. */
+  private applyAdminLoginValidators(type: LoginType): void {
+    const { adminEmail, adminPhone } = this.form.controls;
+    if (type === 'MOBILE') {
+      adminEmail.setValidators([Validators.email]);
+      adminPhone.setValidators([Validators.required, phoneNumberValidator()]);
+    } else {
+      adminEmail.setValidators([Validators.required, Validators.email]);
+      adminPhone.setValidators([phoneNumberValidator()]);
+    }
+    adminEmail.updateValueAndValidity();
+    adminPhone.updateValueAndValidity();
   }
 
   load(page: number): void {
@@ -190,6 +211,7 @@ export class SocietyListComponent {
       secondaryColor: '#F59E0B',
       domainStartDate: '',
       domainExpiryDate: '',
+      loginType: 'EMAIL',
       adminName: '',
       adminEmail: '',
       adminPhone: '',
@@ -279,9 +301,10 @@ export class SocietyListComponent {
         secondaryColor: value.secondaryColor || null,
         domainStartDate: value.domainStartDate,
         domainExpiryDate: value.domainExpiryDate,
+        loginType: value.loginType,
         adminName: value.adminName,
-        adminEmail: value.adminEmail,
-        adminPhone: value.adminPhone || null,
+        adminEmail: value.adminEmail.trim() || null,
+        adminPhone: value.adminPhone.replace(/[\s-]/g, '') || null,
         adminPassword: value.adminPassword,
         features: value.features
       })

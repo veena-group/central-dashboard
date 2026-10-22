@@ -9,6 +9,7 @@ import {
   FeatureConfigRequest,
   FeatureResponse,
   OnboardSocietyRequest,
+  LoginType,
   OnboardSocietyResponse,
   PaymentRequest,
   PaymentResponse,
@@ -58,6 +59,13 @@ export class SuperAdminApiService {
   updateSociety(societyId: number, request: UpdateSocietyRequest): Observable<SocietyResponse> {
     return this.http
       .put<ApiResponse<SocietyResponse>>(`${this.base}/${societyId}`, request)
+      .pipe(map((response) => response.data));
+  }
+
+  /** Rejects with a 409 whose `error.data` is a LoginTypeChangeBlockers when members still need fixing. */
+  updateLoginType(societyId: number, loginType: LoginType): Observable<SocietyResponse> {
+    return this.http
+      .put<ApiResponse<SocietyResponse>>(`${this.base}/${societyId}/login-type`, { loginType })
       .pipe(map((response) => response.data));
   }
 

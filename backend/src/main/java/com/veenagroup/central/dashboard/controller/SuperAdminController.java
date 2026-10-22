@@ -80,6 +80,13 @@ public class SuperAdminController {
         return ApiResponse.of("Society updated successfully", societyService.update(societyId, request));
     }
 
+    /** Responds 409 LOGIN_TYPE_CHANGE_BLOCKED, with the members to fix in `data`, if the switch isn't safe yet. */
+    @PutMapping("/{societyId}/login-type")
+    public ApiResponse<SocietyResponse> updateLoginType(@PathVariable Long societyId, @Valid @RequestBody UpdateLoginTypeRequest request) {
+        log.info("Changing login type of society {} to {}", societyId, request.loginType());
+        return ApiResponse.of("Login type updated successfully", societyService.changeLoginType(societyId, request.loginType()));
+    }
+
     @PostMapping("/{societyId}/logo")
     public ApiResponse<SocietyResponse> uploadLogo(@PathVariable Long societyId, @RequestParam("file") MultipartFile file) {
         log.info("Uploading logo for society {}", societyId);

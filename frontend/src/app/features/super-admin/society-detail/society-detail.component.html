@@ -284,6 +284,70 @@
   <div class="card">
     <div class="card-header">
       <div>
+        <h4 class="card-title">Member Sign-in Method</h4>
+        <p class="text-sm text-muted-foreground">What everyone in this society (admins and members) uses to sign in</p>
+      </div>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="label" for="societyLoginType">Sign in with</label>
+          <select id="societyLoginType" class="input w-56" [formControl]="loginTypeControl" [disabled]="changingLoginType()">
+            <option value="EMAIL">Email</option>
+            <option value="MOBILE">Mobile number</option>
+          </select>
+        </div>
+        <button type="button" class="btn btn-primary" [disabled]="changingLoginType() || !loginTypeChanged()" (click)="requestLoginTypeChange()">
+          @if (changingLoginType()) { Updating... } @else { Update Sign-in Method }
+        </button>
+      </div>
+      <p class="text-xs text-muted-foreground">
+        The switch is only allowed once every member already has the new identifier
+        (and, for mobile, each number is valid and unique within the society).
+        People who are signed in stay signed in; they use the new identifier next time.
+      </p>
+
+      @if (loginTypeBlockers(); as blockers) {
+        <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <p class="text-sm font-medium text-destructive">
+            Can't switch to {{ blockers.targetLoginType === 'MOBILE' ? 'mobile number' : 'email' }} yet &mdash;
+            {{ blockers.totalCount }} member{{ blockers.totalCount === 1 ? '' : 's' }} need{{ blockers.totalCount === 1 ? 's' : '' }} fixing first.
+            Update them from the society admin's Members page, then try again.
+          </p>
+          <ul class="mt-3 max-h-64 overflow-auto divide-y divide-border text-sm">
+            @for (item of blockers.items; track item.memberId + item.reason) {
+              <li class="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                <span class="text-foreground">
+                  {{ item.name }}
+                  @if (item.wing || item.flat) {
+                    <span class="text-muted-foreground">({{ item.wing }}-{{ item.flat }})</span>
+                  }
+                </span>
+                <span class="text-xs text-destructive">{{ blockerReason(item.reason) }}</span>
+              </li>
+            }
+          </ul>
+          @if (blockers.totalCount > blockers.items.length) {
+            <p class="mt-2 text-xs text-muted-foreground">Showing the first {{ blockers.items.length }} of {{ blockers.totalCount }}.</p>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <app-confirm-modal
+    [open]="showLoginTypeConfirm()"
+    title="Change sign-in method"
+    iconTone="warning"
+    [message]="loginTypeConfirmMessage()"
+    confirmLabel="Change"
+    [confirming]="changingLoginType()"
+    (confirmAction)="confirmLoginTypeChange()"
+    (cancelAction)="showLoginTypeConfirm.set(false)"></app-confirm-modal>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
         <h4 class="card-title">Admin Accounts</h4>
         <p class="text-sm text-muted-foreground">Society admin users created during onboarding</p>
       </div>
@@ -299,10 +363,12 @@
               <span class="badge badge-soft-primary">Admin</span>
             </div>
             <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span class="inline-flex min-w-0 items-center gap-1.5">
-                <app-icon name="mail" [size]="14" />
-                <span class="truncate">{{ admin.email }}</span>
-              </span>
+              @if (admin.email) {
+                <span class="inline-flex min-w-0 items-center gap-1.5">
+                  <app-icon name="mail" [size]="14" />
+                  <span class="truncate">{{ admin.email }}</span>
+                </span>
+              }
               @if (admin.phone) {
                 <span class="inline-flex items-center gap-1.5">
                   <app-icon name="phone" [size]="14" />

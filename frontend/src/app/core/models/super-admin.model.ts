@@ -1,3 +1,4 @@
+export type LoginType = 'EMAIL' | 'MOBILE';
 export type FeatureKey = 'MEMBERS' | 'NOTICES' | 'DOCUMENTS' | 'FORMS' | 'COMMITTEE' | 'MEETINGS' | 'GALLERY' | 'EVENTS';
 export type HostingState = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'NONE';
 export type SubscriptionState = 'PAID_UP' | 'DUE_SOON' | 'OVERDUE' | 'NONE';
@@ -24,8 +25,9 @@ export interface OnboardSocietyRequest {
   secondaryColor: string | null;
   domainStartDate: string;
   domainExpiryDate: string;
+  loginType: LoginType;
   adminName: string;
-  adminEmail: string;
+  adminEmail: string | null;
   adminPhone: string | null;
   adminPassword: string;
   features: FeatureConfigRequest[];
@@ -36,7 +38,9 @@ export interface OnboardSocietyResponse {
   societyName: string;
   domain: string;
   adminUserId: number;
-  adminEmail: string;
+  adminEmail: string | null;
+  adminPhone: string | null;
+  loginType: LoginType;
 }
 
 export interface SocietyResponse {
@@ -51,6 +55,7 @@ export interface SocietyResponse {
   currentNextDueDate: string | null;
   subscriptionState: SubscriptionState;
   createdAt: string;
+  loginType: LoginType;
 }
 
 export interface UpdateSocietyRequest {
@@ -102,7 +107,21 @@ export interface PlatformStatsResponse {
 export interface SocietyAdminResponse {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   createdAt: string;
+}
+
+export interface LoginTypeChangeBlocker {
+  memberId: number;
+  name: string;
+  flat: string | null;
+  wing: string | null;
+  reason: 'MISSING_EMAIL' | 'MISSING_PHONE' | 'INVALID_PHONE' | 'DUPLICATE_PHONE';
+}
+
+export interface LoginTypeChangeBlockers {
+  targetLoginType: LoginType;
+  totalCount: number;
+  items: LoginTypeChangeBlocker[];
 }

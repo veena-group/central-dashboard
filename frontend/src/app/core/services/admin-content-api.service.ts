@@ -8,7 +8,7 @@ export interface CreateMemberRequest {
   name: string;
   flat: string | null;
   wing: string | null;
-  email: string;
+  email: string | null;
   phone: string | null;
   role: 'MEMBER' | 'SOCIETY_ADMIN';
   password: string;
@@ -25,7 +25,8 @@ export interface UpdateMemberRequest {
 export interface BulkMemberRowResult {
   rowNumber: number;
   name: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   success: boolean;
   message: string;
   memberId: number | null;
@@ -178,6 +179,13 @@ export class AdminContentApiService {
     return this.http
       .post<ApiResponse<{ existingEmails: string[] }>>(`${this.base}/members/check-emails`, { emails })
       .pipe(map((response) => response.data.existingEmails));
+  }
+
+  /** Which of these mobile numbers already belong to a member of this society. */
+  checkExistingPhones(phones: string[]): Observable<string[]> {
+    return this.http
+      .post<ApiResponse<{ existingPhones: string[] }>>(`${this.base}/members/check-phones`, { phones })
+      .pipe(map((response) => response.data.existingPhones));
   }
 
   deleteMember(memberId: number): Observable<void> {

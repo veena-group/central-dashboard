@@ -5,6 +5,8 @@ public record OnboardSocietyResponse(
         String societyName,
         String domain,
         Long adminUserId,
-        String adminEmail
+        String adminEmail,
+        String adminPhone,
+        String loginType
 ) {
 }

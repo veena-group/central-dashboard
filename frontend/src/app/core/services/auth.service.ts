@@ -87,6 +87,8 @@ export class AuthService {
       ...current,
       name: profile.name,
       email: profile.email,
+      phone: profile.phone,
+      loginType: profile.loginType,
       photoUrl: profile.photoUrl
     };
     localStorage.setItem(USER_KEY, JSON.stringify(updated));
@@ -108,7 +110,9 @@ export class AuthService {
       secondaryColor: response.secondaryColor,
       role: response.role,
       societyId: response.societyId,
-      societyDomain: response.societyDomain
+      societyDomain: response.societyDomain,
+      phone: response.phone ?? null,
+      loginType: response.loginType ?? 'EMAIL'
     };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     this.currentUserSignal.set(user);

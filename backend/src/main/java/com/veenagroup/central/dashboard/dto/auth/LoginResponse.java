@@ -15,6 +15,8 @@ public record LoginResponse(
         String secondaryColor,
         String role,
         Long societyId,
-        String societyDomain
+        String societyDomain,
+        String phone,
+        String loginType
 ) {
 }

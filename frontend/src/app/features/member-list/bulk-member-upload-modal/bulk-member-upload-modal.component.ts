@@ -7,6 +7,7 @@ import {
   CreateMemberRequest
 } from '../../../core/services/admin-content-api.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { LoginType } from '../../../core/models/auth.model';
 import { generateMemberPassword } from '../../../core/utils/password-generator';
 import { isValidPhoneNumber } from '../../../core/utils/phone-validator';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
@@ -46,8 +47,13 @@ export class BulkMemberUploadModalComponent {
 
   /** Emails already confirmed to exist in the system, accumulated across every check so far. */
   private readonly existingEmails = signal<Set<string>>(new Set());
+  /** Same, for mobile numbers within this society (only checked when the society signs in by mobile). */
+  private readonly existingPhones = signal<Set<string>>(new Set());
 
   readonly open = input(false);
+  /** How this society's members sign in: decides whether Email or Phone is the mandatory column. */
+  readonly loginType = input<LoginType>('EMAIL');
+  readonly mobileLogin = computed(() => this.loginType() === 'MOBILE');
   readonly closed = output<void>();
   readonly imported = output<void>();
 
@@ -76,7 +82,7 @@ export class BulkMemberUploadModalComponent {
 
   constructor() {
     this.emailRecheckTrigger.pipe(debounceTime(400)).subscribe(() => {
-      void this.flagAlreadyRegisteredEmails();
+      void this.flagAlreadyRegisteredContacts();
     });
   }
 
@@ -147,7 +153,7 @@ export class BulkMemberUploadModalComponent {
           case 'wing':
             return { ...row, wing: rawValue.trim() || null };
           case 'phone':
-            return { ...row, phone: rawValue.trim() || null };
+            return { ...row, phone: BulkMemberUploadModalComponent.cleanPhone(rawValue) };
           case 'password':
             return { ...row, rawPassword: rawValue.trim() };
         }
@@ -156,7 +162,7 @@ export class BulkMemberUploadModalComponent {
 
     this.revalidateAllRows();
 
-    if (field === 'email') {
+    if (field === 'email' || field === 'phone') {
       this.emailRecheckTrigger.next();
     }
   }
@@ -172,7 +178,7 @@ export class BulkMemberUploadModalComponent {
       name: row.name,
       flat: row.flat,
       wing: row.wing,
-      email: row.email,
+      email: row.email || null,
       phone: row.phone,
       role: 'MEMBER',
       password: row.password
@@ -243,7 +249,7 @@ export class BulkMemberUploadModalComponent {
       }
 
       this.rows.set(this.parseRows(rawRows));
-      await this.flagAlreadyRegisteredEmails();
+      await this.flagAlreadyRegisteredContacts();
     } catch {
       this.parseError.set('Could not read this file. Please upload a valid .xlsx or .xls file.');
     } finally {
@@ -251,41 +257,58 @@ export class BulkMemberUploadModalComponent {
     }
   }
 
-  private async flagAlreadyRegisteredEmails(): Promise<void> {
-    const candidateEmails = this.rows()
-      .filter((row) => row.status === 'ready')
-      .map((row) => row.email);
+  private async flagAlreadyRegisteredContacts(): Promise<void> {
+    const readyRows = this.rows().filter((row) => row.status === 'ready');
+    const candidateEmails = readyRows.map((row) => row.email).filter((email) => !!email);
+    const candidatePhones = this.mobileLogin()
+      ? readyRows.map((row) => row.phone).filter((phone): phone is string => !!phone)
+      : [];
 
-    if (candidateEmails.length === 0) {
+    if (candidateEmails.length === 0 && candidatePhones.length === 0) {
       return;
     }
 
     this.checkingEmails.set(true);
     try {
-      const existingEmails = await firstValueFrom(this.adminApi.checkExistingEmails(candidateEmails));
-      if (existingEmails.length > 0) {
-        const merged = new Set(this.existingEmails());
-        existingEmails.forEach((email) => merged.add(email.toLowerCase()));
-        this.existingEmails.set(merged);
+      let changed = false;
+      if (candidateEmails.length > 0) {
+        const existingEmails = await firstValueFrom(this.adminApi.checkExistingEmails(candidateEmails));
+        if (existingEmails.length > 0) {
+          const merged = new Set(this.existingEmails());
+          existingEmails.forEach((email) => merged.add(email.toLowerCase()));
+          this.existingEmails.set(merged);
+          changed = true;
+        }
+      }
+      if (candidatePhones.length > 0) {
+        const existingPhones = await firstValueFrom(this.adminApi.checkExistingPhones(candidatePhones));
+        if (existingPhones.length > 0) {
+          const merged = new Set(this.existingPhones());
+          existingPhones.forEach((phone) => merged.add(phone));
+          this.existingPhones.set(merged);
+          changed = true;
+        }
+      }
+      if (changed) {
         this.revalidateAllRows();
       }
     } catch {
-      this.toast.warning('Could not verify emails against existing members. Duplicate emails will be reported when you import.');
+      this.toast.warning('Could not verify entries against existing members. Duplicates will be reported when you import.');
     } finally {
       this.checkingEmails.set(false);
     }
   }
 
-  /** Re-applies every validation rule (required fields, formats, in-file duplicates, known-registered emails). */
+  /** Re-applies every validation rule (required fields, formats, in-file duplicates, known-registered emails / phones). */
   private revalidateAllRows(): void {
-    const seenEmails = new Set<string>();
-    const existingEmails = this.existingEmails();
-    this.rows.update((rows) => rows.map((row) => this.validateRow(row, seenEmails, existingEmails)));
+    const seen = { emails: new Set<string>(), phones: new Set<string>() };
+    const existing = { emails: this.existingEmails(), phones: this.existingPhones() };
+    this.rows.update((rows) => rows.map((row) => this.validateRow(row, seen, existing)));
   }
 
   private parseRows(rawRows: Record<string, unknown>[]): ParsedRow[] {
-    const seenEmails = new Set<string>();
-    const existingEmails = this.existingEmails();
+    const seen = { emails: new Set<string>(), phones: new Set<string>() };
+    const existing = { emails: this.existingEmails(), phones: this.existingPhones() };
 
     return rawRows.map((raw, index): ParsedRow => {
       const lookup = this.buildLookup(raw);
@@ -295,39 +318,60 @@ export class BulkMemberUploadModalComponent {
         email: this.textValue(lookup, 'email').toLowerCase(),
         flat: this.textValue(lookup, 'flat') || null,
         wing: this.textValue(lookup, 'wing') || null,
-        phone: this.textValue(lookup, 'phone') || null,
+        phone: BulkMemberUploadModalComponent.cleanPhone(this.textValue(lookup, 'phone')),
         rawPassword: this.textValue(lookup, 'password'),
         password: '',
         status: 'ready',
         statusMessage: null
       };
-      return this.validateRow(row, seenEmails, existingEmails);
+      return this.validateRow(row, seen, existing);
     });
   }
 
-  private validateRow(row: ParsedRow, seenEmails: Set<string>, existingEmails: Set<string>): ParsedRow {
+  private validateRow(
+    row: ParsedRow,
+    seen: { emails: Set<string>; phones: Set<string> },
+    existing: { emails: Set<string>; phones: Set<string> }
+  ): ParsedRow {
     const { name, email, phone } = row;
     const errors: string[] = [];
+    const mobileLogin = this.mobileLogin();
 
     if (!name) {
       errors.push('Name is required');
     }
 
+    // The society's sign-in identifier is mandatory; the other one is optional but still checked when given.
     if (!email) {
-      errors.push('Email is required');
+      if (!mobileLogin) {
+        errors.push('Email is required');
+      }
     } else if (!EMAIL_PATTERN.test(email)) {
       errors.push('Email is invalid');
-    } else if (seenEmails.has(email)) {
+    } else if (seen.emails.has(email)) {
       errors.push('Duplicate email in this file');
     } else {
-      seenEmails.add(email);
-      if (existingEmails.has(email)) {
+      seen.emails.add(email);
+      if (existing.emails.has(email)) {
         errors.push('Email already registered');
       }
     }
 
-    if (phone && !isValidPhoneNumber(phone)) {
+    if (!phone) {
+      if (mobileLogin) {
+        errors.push('Phone is required');
+      }
+    } else if (!isValidPhoneNumber(phone)) {
       errors.push('Phone must be a valid 10-digit Indian mobile number');
+    } else if (mobileLogin) {
+      if (seen.phones.has(phone)) {
+        errors.push('Duplicate phone in this file');
+      } else {
+        seen.phones.add(phone);
+        if (existing.phones.has(phone)) {
+          errors.push('Phone already registered');
+        }
+      }
     }
 
     if (row.rawPassword && row.rawPassword.length < MIN_PASSWORD_LENGTH) {
@@ -364,5 +408,11 @@ export class BulkMemberUploadModalComponent {
     this.submitted.set(false);
     this.previewPage.set(0);
     this.existingEmails.set(new Set());
+    this.existingPhones.set(new Set());
+  }
+
+  /** Strips spaces and hyphens (e.g. "98765 43210"); blank becomes null. */
+  private static cleanPhone(value: string): string | null {
+    return value.replace(/[\s-]/g, '') || null;
   }
 }

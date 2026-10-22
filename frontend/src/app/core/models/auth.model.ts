@@ -1,7 +1,9 @@
 export type Role = 'SUPER_ADMIN' | 'SOCIETY_ADMIN' | 'MEMBER';
+export type LoginType = 'EMAIL' | 'MOBILE';
 
 export interface LoginRequest {
-  email: string;
+  /** Email or mobile number, depending on the society's login type. */
+  identifier: string;
   password: string;
 }
 
@@ -12,7 +14,7 @@ export interface LoginResponse {
   expiresIn: number;
   userId: number;
   name: string;
-  email: string;
+  email: string | null;
   photoUrl: string | null;
   societyName: string | null;
   societyLogoUrl: string | null;
@@ -21,12 +23,14 @@ export interface LoginResponse {
   role: Role;
   societyId: number | null;
   societyDomain: string | null;
+  phone: string | null;
+  loginType: LoginType;
 }
 
 export interface CurrentUser {
   userId: number;
   name: string;
-  email: string;
+  email: string | null;
   photoUrl: string | null;
   societyName: string | null;
   societyLogoUrl: string | null;
@@ -35,4 +39,6 @@ export interface CurrentUser {
   role: Role;
   societyId: number | null;
   societyDomain: string | null;
+  phone?: string | null;
+  loginType?: LoginType;
 }

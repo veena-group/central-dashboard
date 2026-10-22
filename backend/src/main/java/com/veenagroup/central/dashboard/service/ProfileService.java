@@ -4,9 +4,11 @@ import com.veenagroup.central.dashboard.dto.me.ChangePasswordRequest;
 import com.veenagroup.central.dashboard.dto.me.MyProfileResponse;
 import com.veenagroup.central.dashboard.dto.me.UpdateMyProfileRequest;
 import com.veenagroup.central.dashboard.entity.Users;
+import com.veenagroup.central.dashboard.entity.enums.LoginType;
 import com.veenagroup.central.dashboard.exception.BusinessException;
 import com.veenagroup.central.dashboard.repository.UsersRepository;
 import com.veenagroup.central.dashboard.storage.FileStorageService;
+import com.veenagroup.central.dashboard.util.ContactNormalizer;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ public class ProfileService {
         this.fileStorageService = fileStorageService;
     }
 
+    /** Transactional because toResponse reads the lazy society (login type) and open-in-view is off. */
+    @Transactional(readOnly = true)
     public MyProfileResponse getProfile(Long userId) {
         return toResponse(findOrThrow(userId));
     }
@@ -36,9 +40,29 @@ public class ProfileService {
         user.setName(request.name().trim());
         user.setFlat(normalize(request.flat()));
         user.setWing(normalize(request.wing()));
-        user.setPhone(normalize(request.phone()));
+        applyPhone(user, request.phone());
         Users updated = usersRepository.save(user);
         return toResponse(updated);
+    }
+
+    /**
+     * For a society that signs in by mobile, the phone number *is* the login, so it can't be cleared
+     * and can't collide with a colleague's. Elsewhere it's optional contact info, but still format-checked.
+     */
+    private void applyPhone(Users user, String requested) {
+        String phone = ContactNormalizer.mobile(requested);
+        if (phone != null && !ContactNormalizer.isValidMobile(phone)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Phone number must be a valid 10-digit Indian mobile number");
+        }
+        if (user.getSociety() != null && user.getSociety().getLoginType() == LoginType.MOBILE) {
+            if (phone == null) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "PHONE_REQUIRED", "Mobile number is required because it is your login");
+            }
+            if (usersRepository.existsBySocietyIdAndPhoneAndIdNot(user.getSociety().getId(), phone, user.getId())) {
+                throw new BusinessException(HttpStatus.CONFLICT, "PHONE_ALREADY_IN_USE", "Mobile number already in use");
+            }
+        }
+        user.setPhone(phone);
     }
 
     @Transactional
@@ -90,7 +114,8 @@ public class ProfileService {
                 user.getRole().name(),
                 user.getSociety() != null ? user.getSociety().getId() : null,
                 user.getPhotoUrl(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                (user.getSociety() != null ? user.getSociety().getLoginType() : LoginType.EMAIL).name()
         );
     }
 }

@@ -10,6 +10,7 @@ public record MyProfileResponse(
         String role,
         Long societyId,
         String photoUrl,
-        java.time.LocalDateTime createdAt
+        java.time.LocalDateTime createdAt,
+        String loginType
 ) {
 }

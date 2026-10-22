@@ -10,7 +10,7 @@
         <app-avatar [name]="p.name" [imageUrl]="p.photoUrl" size="xl" />
         <div class="min-w-0">
           <h5 class="text-base font-semibold text-foreground truncate">{{ p.name }}</h5>
-          <p class="text-sm text-muted-foreground truncate">{{ p.email }}</p>
+          <p class="text-sm text-muted-foreground truncate">{{ p.email || p.phone }}</p>
           <div class="mt-2 flex items-center gap-2">
             <span class="badge badge-soft-primary">{{ p.role }}</span>
           </div>
@@ -103,7 +103,7 @@
           </div>
           <div>
             <p class="text-xs text-muted-foreground">Email Address</p>
-            <p class="text-sm font-medium text-foreground">{{ p.email }}</p>
+            <p class="text-sm font-medium text-foreground">{{ p.email || 'Not provided' }}</p>
           </div>
           <div>
             <p class="text-xs text-muted-foreground">Role</p>
@@ -139,8 +139,11 @@
               </div>
 
               <div>
-                <label class="label" for="profilePhone">Phone Number</label>
+                <label class="label" [class.required]="mobileLogin" for="profilePhone">Phone Number</label>
                 <input id="profilePhone" type="text" class="input" formControlName="phone" placeholder="Enter phone number" />
+                @if (profileForm.controls.phone.invalid && profileForm.controls.phone.touched) {
+                  <p class="mt-1 text-xs text-destructive">{{ mobileLogin ? 'A valid 10-digit mobile number is required (it is your login).' : 'Enter a valid 10-digit mobile number.' }}</p>
+                }
               </div>
 
               <div>

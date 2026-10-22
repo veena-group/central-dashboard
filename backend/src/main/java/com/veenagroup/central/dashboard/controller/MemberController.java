@@ -8,6 +8,8 @@ import com.veenagroup.central.dashboard.dto.admin.BulkDeleteResult;
 import com.veenagroup.central.dashboard.dto.admin.BulkMemberRowResult;
 import com.veenagroup.central.dashboard.dto.admin.CheckEmailsRequest;
 import com.veenagroup.central.dashboard.dto.admin.CheckEmailsResponse;
+import com.veenagroup.central.dashboard.dto.admin.CheckPhonesRequest;
+import com.veenagroup.central.dashboard.dto.admin.CheckPhonesResponse;
 import com.veenagroup.central.dashboard.dto.admin.CreateMemberRequest;
 import com.veenagroup.central.dashboard.dto.admin.MemberResponse;
 import com.veenagroup.central.dashboard.dto.admin.UpdateMemberRequest;
@@ -72,16 +74,16 @@ public class MemberController {
             Set<ConstraintViolation<CreateMemberRequest>> violations = validator.validate(row);
             if (!violations.isEmpty()) {
                 String message = violations.stream().map(ConstraintViolation::getMessage).distinct().collect(Collectors.joining("; "));
-                results.add(new BulkMemberRowResult(rowNumber, row.name(), row.email(), false, message, null));
+                results.add(new BulkMemberRowResult(rowNumber, row.name(), row.email(), row.phone(), false, message, null));
                 continue;
             }
 
             try {
                 MemberResponse created = memberService.create(societyId, row);
-                results.add(new BulkMemberRowResult(rowNumber, row.name(), row.email(), true, "Member created successfully", created.id()));
+                results.add(new BulkMemberRowResult(rowNumber, row.name(), row.email(), row.phone(), true, "Member created successfully", created.id()));
                 successCount++;
             } catch (BusinessException e) {
-                results.add(new BulkMemberRowResult(rowNumber, row.name(), row.email(), false, e.getMessage(), null));
+                results.add(new BulkMemberRowResult(rowNumber, row.name(), row.email(), row.phone(), false, e.getMessage(), null));
             }
         }
 
@@ -94,6 +96,13 @@ public class MemberController {
     public ApiResponse<CheckEmailsResponse> checkEmails(@Valid @RequestBody CheckEmailsRequest request) {
         List<String> existingEmails = memberService.findExistingEmails(request.emails());
         return ApiResponse.of("Checked emails", new CheckEmailsResponse(existingEmails));
+    }
+
+    /** Which of these mobile numbers already belong to a member of the caller's society. */
+    @PostMapping("/check-phones")
+    public ApiResponse<CheckPhonesResponse> checkPhones(@Valid @RequestBody CheckPhonesRequest request) {
+        List<String> existingPhones = memberService.findExistingPhones(currentUser.requireSocietyId(), request.phones());
+        return ApiResponse.of("Checked phone numbers", new CheckPhonesResponse(existingPhones));
     }
 
     @GetMapping

@@ -6,6 +6,7 @@ import { MyProfileResponse } from '../../core/models/profile.model';
 import { AvatarComponent } from '../../shared/avatar/avatar.component';
 import { NotificationService } from '../../core/services/notification.service';
 import { AuthService } from '../../core/services/auth.service';
+import { phoneNumberValidator } from '../../core/utils/phone-validator';
 
 @Component({
   selector: 'app-profile',
@@ -33,9 +34,12 @@ export class ProfileComponent implements OnDestroy {
   readonly showCurrentPassword = signal(false);
   readonly showNewPassword = signal(false);
 
+  /** In a mobile-login society the phone number is the login, so it can't be blank. */
+  readonly mobileLogin = this.auth.currentUser()?.loginType === 'MOBILE';
+
   readonly profileForm = this.fb.nonNullable.group({
     name: ['', [Validators.required]],
-    phone: [''],
+    phone: ['', this.mobileLogin ? [Validators.required, phoneNumberValidator()] : [phoneNumberValidator()]],
     wing: [''],
     flat: ['']
   });
@@ -84,7 +88,7 @@ export class ProfileComponent implements OnDestroy {
     this.savingProfile.set(true);
     this.api.updateMyProfile({
       name: value.name.trim(),
-      phone: this.normalizeOptional(value.phone),
+      phone: this.normalizeOptional(value.phone)?.replace(/[\s-]/g, '') ?? null,
       wing: this.normalizeOptional(value.wing),
       flat: this.normalizeOptional(value.flat)
     }).subscribe({

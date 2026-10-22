@@ -28,8 +28,20 @@ public interface UsersRepository extends JpaRepository<Users, Long>, JpaSpecific
      * write back count+1, silently losing one of the increments (see LoginAttemptService).
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT u FROM Users u WHERE u.email = :email")
-    Optional<Users> findByEmailForUpdate(@Param("email") String email);
+    @Query("SELECT u FROM Users u WHERE u.id = :id")
+    Optional<Users> findByIdForUpdate(@Param("id") Long id);
+
+    /** A list, not Optional: phone is not DB-unique, so legacy data may hold duplicates - callers must treat >1 as ambiguous. */
+    List<Users> findAllBySocietyIdAndPhone(Long societyId, String phone);
+
+    List<Users> findAllByPhone(String phone);
+
+    boolean existsBySocietyIdAndPhoneAndIdNot(Long societyId, String phone, Long id);
+
+    boolean existsBySocietyIdAndPhone(Long societyId, String phone);
+
+    @Query("SELECT u.phone FROM Users u WHERE u.society.id = :societyId AND u.phone IN :phones")
+    List<String> findPhonesInSociety(@Param("societyId") Long societyId, @Param("phones") Collection<String> phones);
 
     List<Users> findBySocietyId(Long societyId);
 

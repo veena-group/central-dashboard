@@ -14,6 +14,7 @@ public record SocietyResponse(
         String hostingState,
         LocalDate currentNextDueDate,
         String subscriptionState,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String loginType
 ) {
 }

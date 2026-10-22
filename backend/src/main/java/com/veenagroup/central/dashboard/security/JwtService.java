@@ -71,7 +71,8 @@ public class JwtService {
                 .getPayload();
     }
 
-    public String extractEmail(String token) {
+    /** The subject is the user id as a string (see CustomUserDetails#getUsername). */
+    public String extractSubject(String token) {
         return extractClaims(token).getSubject();
     }
 
@@ -83,7 +84,7 @@ public class JwtService {
                 && matchesTokenVersion(claims, userDetails);
     }
 
-    public String extractEmailFromRefreshToken(String refreshToken) {
+    public String extractSubjectFromRefreshToken(String refreshToken) {
         Claims claims;
         try {
             claims = extractClaims(refreshToken);

@@ -16,6 +16,9 @@
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/20 px-4 py-3">
           <p class="text-sm text-muted-foreground">
             Need the column layout? Download the template, fill it in, then upload it below.
+            Members of this society sign in with their
+            <strong class="text-foreground">{{ mobileLogin() ? 'mobile number' : 'email' }}</strong>, so
+            {{ mobileLogin() ? 'the Phone column is required for every row (Email is optional).' : 'the Email column is required for every row (Phone is optional).' }}
           </p>
           <button type="button" class="btn btn-outline btn-sm shrink-0" (click)="downloadTemplate()">Download Template</button>
         </div>
@@ -43,7 +46,7 @@
             <p class="mt-2 text-xs text-muted-foreground">Reading file...</p>
           }
           @if (checkingEmails()) {
-            <p class="mt-2 text-xs text-muted-foreground">Checking emails against existing members...</p>
+            <p class="mt-2 text-xs text-muted-foreground">Checking entries against existing members...</p>
           }
           @if (parseError()) {
             <p class="mt-2 text-xs text-destructive">{{ parseError() }}</p>
@@ -71,9 +74,9 @@
                   <tr>
                     <th>#</th>
                     <th>Name</th>
-                    <th>Email</th>
+                    <th>Email{{ mobileLogin() ? '' : ' *' }}</th>
                     <th>Flat / Wing</th>
-                    <th>Phone</th>
+                    <th>Phone{{ mobileLogin() ? ' *' : '' }}</th>
                     <th>Password</th>
                     <th>Status</th>
                   </tr>

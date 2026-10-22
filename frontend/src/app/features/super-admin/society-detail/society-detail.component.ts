@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -7,6 +8,9 @@ import {
   DomainRenewalResponse,
   FEATURE_KEYS,
   FeatureResponse,
+  LoginType,
+  LoginTypeChangeBlocker,
+  LoginTypeChangeBlockers,
   PaymentResponse,
   SocietyAdminResponse,
   SocietyResponse
@@ -14,6 +18,7 @@ import {
 import { featureLimitValidator } from '../../../core/validators/feature-limit.validator';
 import { NotificationService } from '../../../core/services/notification.service';
 import { IconComponent, IconName } from '../../../shared/icon/icon.component';
+import { ConfirmModalComponent } from '../../../shared/confirm-modal/confirm-modal.component';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { SecureImageComponent } from '../../../shared/secure-image/secure-image.component';
 import { MediaUrlService } from '../../../core/services/media-url.service';
@@ -30,7 +35,7 @@ const TAB_ICONS: Record<SocietyDetailTab, IconName> = {
 
 @Component({
   selector: 'app-society-detail',
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, IconComponent, AvatarComponent, SecureImageComponent],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, IconComponent, AvatarComponent, SecureImageComponent, ConfirmModalComponent],
   templateUrl: './society-detail.component.html'
 })
 export class SocietyDetailComponent {
@@ -64,6 +69,23 @@ export class SocietyDetailComponent {
   readonly logoDragActive = signal(false);
   readonly logoError = signal<string | null>(null);
   readonly uploadingLogo = signal(false);
+
+  readonly loginTypeControl = this.fb.nonNullable.control<LoginType>('EMAIL');
+  readonly changingLoginType = signal(false);
+  readonly showLoginTypeConfirm = signal(false);
+  /** Set when the backend refuses a switch because some members still lack the new identifier. */
+  readonly loginTypeBlockers = signal<LoginTypeChangeBlockers | null>(null);
+  private readonly selectedLoginType = signal<LoginType>('EMAIL');
+
+  readonly loginTypeChanged = computed(() => {
+    const current = this.society()?.loginType;
+    return !!current && this.selectedLoginType() !== current;
+  });
+  readonly loginTypeConfirmMessage = computed(() =>
+    this.selectedLoginType() === 'MOBILE'
+      ? 'Everyone in this society will sign in with their mobile number instead of email. Members without a valid, unique mobile number will block the change.'
+      : 'Everyone in this society will sign in with their email instead of mobile number. Members without an email will block the change.'
+  );
 
   readonly detailsForm = this.fb.nonNullable.group({
     name: ['', [Validators.required]],
@@ -100,6 +122,10 @@ export class SocietyDetailComponent {
   private featureRowIds: (number | null)[] = [];
 
   constructor() {
+    this.loginTypeControl.valueChanges.subscribe((value) => {
+      this.selectedLoginType.set(value);
+      this.loginTypeBlockers.set(null);
+    });
     this.loadSociety();
     this.api.getFeatures(this.societyId).subscribe((features) => this.applyFeatures(features));
     this.api.listAdmins(this.societyId).subscribe((admins) => this.admins.set(admins));
@@ -159,6 +185,8 @@ export class SocietyDetailComponent {
   private loadSociety(): void {
     this.api.getSociety(this.societyId).subscribe((society) => {
       this.society.set(society);
+      this.loginTypeControl.setValue(society.loginType, { emitEvent: false });
+      this.selectedLoginType.set(society.loginType);
       this.detailsForm.patchValue({
         name: society.name,
         domain: society.domain,
@@ -190,6 +218,48 @@ export class SocietyDetailComponent {
 
   loadDomainRenewals(): void {
     this.api.listDomainRenewals(this.societyId).subscribe((renewals) => this.domainRenewals.set(renewals));
+  }
+
+  requestLoginTypeChange(): void {
+    if (this.loginTypeChanged()) {
+      this.showLoginTypeConfirm.set(true);
+    }
+  }
+
+  confirmLoginTypeChange(): void {
+    this.changingLoginType.set(true);
+    this.loginTypeBlockers.set(null);
+
+    this.api.updateLoginType(this.societyId, this.selectedLoginType()).subscribe({
+      next: (society) => {
+        this.society.set(society);
+        this.changingLoginType.set(false);
+        this.showLoginTypeConfirm.set(false);
+        this.toast.success('Sign-in method updated.');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.changingLoginType.set(false);
+        this.showLoginTypeConfirm.set(false);
+        if (err.error?.errorCode === 'LOGIN_TYPE_CHANGE_BLOCKED' && err.error?.data) {
+          this.loginTypeBlockers.set(err.error.data as LoginTypeChangeBlockers);
+          return;
+        }
+        this.toast.error(err.error?.message ?? 'Could not update the sign-in method.');
+      }
+    });
+  }
+
+  blockerReason(reason: LoginTypeChangeBlocker['reason']): string {
+    switch (reason) {
+      case 'MISSING_EMAIL':
+        return 'No email';
+      case 'MISSING_PHONE':
+        return 'No mobile number';
+      case 'INVALID_PHONE':
+        return 'Mobile number is not a valid 10-digit number';
+      case 'DUPLICATE_PHONE':
+        return 'Mobile number is shared with another member';
+    }
   }
 
   saveDetails(): void {

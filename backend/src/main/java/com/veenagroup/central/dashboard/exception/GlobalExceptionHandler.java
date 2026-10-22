@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
         } else {
             log.warn("Business error [{}]: {}", ex.getErrorCode(), ex.getMessage());
         }
-        return build(ex.getStatus(), ex.getMessage(), ex.getErrorCode(), null, request);
+        return build(ex.getStatus(), ex.getMessage(), ex.getErrorCode(), ex.getData(), request);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
         log.warn("Authentication failed: {}", ex.getMessage());
-        return build(HttpStatus.UNAUTHORIZED, "Invalid email or password", "INVALID_CREDENTIALS", null, request);
+        return build(HttpStatus.UNAUTHORIZED, "Invalid credentials", "INVALID_CREDENTIALS", null, request);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

@@ -60,6 +60,7 @@
         <tr>
           <th>Name</th>
           <th>Domain</th>
+          <th>Sign-in</th>
           <th>Hosting</th>
           <th>Subscription</th>
           <th></th>
@@ -70,6 +71,7 @@
           <tr>
             <td class="font-medium text-foreground">{{ society.name }}</td>
             <td class="text-muted-foreground">{{ society.domain }}</td>
+            <td><span class="badge badge-soft-secondary">{{ society.loginType === 'MOBILE' ? 'Mobile' : 'Email' }}</span></td>
             <td>
               <span [class]="'badge badge-soft-' + hostingVariant(society.hostingState)">{{ society.hostingState.replace('_', ' ') }}</span>
               <div class="mt-0.5 text-xs text-muted-foreground">{{ society.currentHostingExpiry || 'No renewal recorded' }}</div>
@@ -88,13 +90,14 @@
               <tr>
                 <td><div class="skeleton h-4 w-32"></div></td>
                 <td><div class="skeleton h-4 w-28"></div></td>
+                <td><div class="skeleton h-5 w-14"></div></td>
                 <td><div class="skeleton h-5 w-20"></div></td>
                 <td><div class="skeleton h-5 w-20"></div></td>
                 <td><div class="skeleton h-8 w-16 rounded-md"></div></td>
               </tr>
             }
           } @else {
-            <tr><td colspan="5" class="text-center text-muted-foreground py-6">
+            <tr><td colspan="6" class="text-center text-muted-foreground py-6">
               {{ hasActiveFilters() ? 'No societies match your filters' : 'No societies onboarded yet' }}
             </td></tr>
           }
@@ -201,13 +204,31 @@
                   <label class="label required" for="adminName">Admin Name</label>
                   <input id="adminName" type="text" class="input" formControlName="adminName" placeholder="e.g. Amit Verma">
                 </div>
-                <div>
-                  <label class="label required" for="adminEmail">Admin Email</label>
-                  <input id="adminEmail" type="email" class="input" formControlName="adminEmail" placeholder="amit@example.com">
+                <div class="form-field-full">
+                  <label class="label required" for="loginType">Members Sign In With</label>
+                  <select id="loginType" class="input" formControlName="loginType">
+                    <option value="EMAIL">Email</option>
+                    <option value="MOBILE">Mobile number</option>
+                  </select>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    Everyone in this society (admins and members) will sign in with their
+                    {{ isMobileLogin ? 'mobile number' : 'email' }}, so it is mandatory when adding members.
+                    You can change this later from the society's page.
+                  </p>
                 </div>
                 <div>
-                  <label class="label" for="adminPhone">Admin Phone</label>
+                  <label class="label" [class.required]="!isMobileLogin" for="adminEmail">Admin Email</label>
+                  <input id="adminEmail" type="email" class="input" formControlName="adminEmail" placeholder="amit@example.com">
+                  @if (form.controls.adminEmail.invalid && form.controls.adminEmail.touched) {
+                    <p class="mt-1 text-xs text-destructive">Enter a valid email address{{ isMobileLogin ? ', or leave it blank.' : '.' }}</p>
+                  }
+                </div>
+                <div>
+                  <label class="label" [class.required]="isMobileLogin" for="adminPhone">Admin Phone</label>
                   <input id="adminPhone" type="text" class="input" formControlName="adminPhone" placeholder="e.g. 9876543210">
+                  @if (form.controls.adminPhone.invalid && form.controls.adminPhone.touched) {
+                    <p class="mt-1 text-xs text-destructive">Enter a valid 10-digit Indian mobile number{{ isMobileLogin ? ' (required).' : '.' }}</p>
+                  }
                 </div>
                 <div>
                   <label class="label" for="adminPassword">Admin Password</label>

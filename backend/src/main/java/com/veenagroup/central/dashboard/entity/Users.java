@@ -35,7 +35,8 @@ public class Users {
 
     private String wing;
 
-    @Column(nullable = false, unique = true)
+    /** Nullable: a society that signs in by mobile need not collect emails. Still unique when present. */
+    @Column(unique = true)
     private String email;
 
     private String phone;

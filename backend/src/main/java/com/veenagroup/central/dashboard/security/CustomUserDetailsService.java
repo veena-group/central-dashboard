@@ -19,6 +19,11 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     /**
+     * The "username" is the user id as a string (see CustomUserDetails#getUsername) - the actual
+     * email/mobile a person typed is resolved to an id by LoginIdentityService before this runs.
+     * A non-numeric value (e.g. a token issued before the id-subject switch, which carried an
+     * email) is simply "not found", so those tokens fail validation and the user signs in again.
+     *
      * Transactional so the lazy Users.society association can still be read while building
      * CustomUserDetails. Callers include JwtAuthenticationFilter, which runs before Spring Boot's
      * open-in-view session is bound to the request — without an explicit transaction here, reading
@@ -26,12 +31,21 @@ public class CustomUserDetailsService implements UserDetailsService {
      */
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return usersRepository.findByEmail(email)
+    public UserDetails loadUserByUsername(String userId) throws UsernameNotFoundException {
+        Long id = parseId(userId);
+        return usersRepository.findById(id)
                 .map(CustomUserDetails::new)
                 .orElseThrow(() -> {
-                    log.debug("No user found for email: {}", email);
-                    return new UsernameNotFoundException("No user found with email: " + email);
+                    log.debug("No user found for id: {}", userId);
+                    return new UsernameNotFoundException("No user found with id: " + userId);
                 });
+    }
+
+    private Long parseId(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            throw new UsernameNotFoundException("Not a user id: " + value);
+        }
     }
 }

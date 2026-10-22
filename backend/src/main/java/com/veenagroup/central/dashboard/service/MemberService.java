@@ -7,11 +7,13 @@ import com.veenagroup.central.dashboard.dto.admin.UpdateMemberRequest;
 import com.veenagroup.central.dashboard.entity.Society;
 import com.veenagroup.central.dashboard.entity.Users;
 import com.veenagroup.central.dashboard.entity.enums.FeatureKey;
+import com.veenagroup.central.dashboard.entity.enums.LoginType;
 import com.veenagroup.central.dashboard.entity.enums.Role;
 import com.veenagroup.central.dashboard.exception.BusinessException;
 import com.veenagroup.central.dashboard.repository.SocietyRepository;
 import com.veenagroup.central.dashboard.repository.UsersRepository;
 import com.veenagroup.central.dashboard.storage.FileStorageService;
+import com.veenagroup.central.dashboard.util.ContactNormalizer;
 import com.veenagroup.central.dashboard.web.PageResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -56,8 +58,14 @@ public class MemberService {
 
         featureLimitService.assertCanCreate(societyId, FeatureKey.MEMBERS, () -> usersRepository.countBySocietyId(societyId));
 
-        if (usersRepository.findByEmail(request.email()).isPresent()) {
+        String email = ContactNormalizer.email(request.email());
+        String phone = ContactNormalizer.mobile(request.phone());
+        assertLoginIdentifiers(society.getLoginType(), email, phone);
+        if (email != null && emailInUse(email)) {
             throw new BusinessException(HttpStatus.CONFLICT, "EMAIL_ALREADY_IN_USE", "Email already in use");
+        }
+        if (society.getLoginType() == LoginType.MOBILE && usersRepository.existsBySocietyIdAndPhone(societyId, phone)) {
+            throw new BusinessException(HttpStatus.CONFLICT, "PHONE_ALREADY_IN_USE", "Mobile number already in use");
         }
 
         Users user = Users.builder()
@@ -65,8 +73,8 @@ public class MemberService {
                 .name(request.name())
                 .flat(request.flat())
                 .wing(request.wing())
-                .email(request.email())
-                .phone(request.phone())
+                .email(email)
+                .phone(phone)
                 .role(request.role())
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .build();
@@ -86,6 +94,39 @@ public class MemberService {
             return List.of();
         }
         return usersRepository.findEmailsIgnoreCaseIn(normalized);
+    }
+
+    public List<String> findExistingPhones(Long societyId, List<String> phones) {
+        List<String> normalized = phones.stream()
+                .map(ContactNormalizer::mobile)
+                .filter(phone -> phone != null)
+                .distinct()
+                .toList();
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+        return usersRepository.findPhonesInSociety(societyId, normalized);
+    }
+
+    /**
+     * The identifier a society signs in with is mandatory for every member (admin or not); the other
+     * one is optional but, when given, must still be well-formed.
+     */
+    private void assertLoginIdentifiers(LoginType loginType, String email, String phone) {
+        if (loginType == LoginType.EMAIL && email == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "EMAIL_REQUIRED", "Email is required for this society");
+        }
+        if (loginType == LoginType.MOBILE && phone == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "PHONE_REQUIRED", "Mobile number is required for this society");
+        }
+        if (phone != null && !ContactNormalizer.isValidMobile(phone)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Phone number must be a valid 10-digit Indian mobile number");
+        }
+    }
+
+    /** Case-insensitive, because the DB unique index is case-sensitive and `Rohan@x.com` / `rohan@x.com` are the same inbox. */
+    private boolean emailInUse(String email) {
+        return !usersRepository.findEmailsIgnoreCaseIn(List.of(email.toLowerCase())).isEmpty();
     }
 
     public List<MemberResponse> list(Long societyId) {
@@ -139,8 +180,16 @@ public class MemberService {
         user.setName(request.name());
         user.setFlat(request.flat());
         user.setWing(request.wing());
-        user.setPhone(request.phone());
+        String phone = ContactNormalizer.mobile(request.phone());
+        LoginType loginType = user.getSociety().getLoginType();
+        assertLoginIdentifiers(loginType, ContactNormalizer.email(user.getEmail()), phone);
+        if (loginType == LoginType.MOBILE && phone != null
+                && usersRepository.existsBySocietyIdAndPhoneAndIdNot(societyId, phone, user.getId())) {
+            throw new BusinessException(HttpStatus.CONFLICT, "PHONE_ALREADY_IN_USE", "Mobile number already in use");
+        }
+        user.setPhone(phone);
         user.setRole(request.role());
+
         Users updated = usersRepository.save(user);
         log.info("Updated member {} for society {}", updated.getId(), societyId);
         return toResponse(updated);

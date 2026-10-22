@@ -39,7 +39,8 @@ export class LoginComponent {
     this.submitting.set(true);
     this.errorMessage.set(null);
 
-    this.auth.login(this.form.getRawValue()).subscribe({
+    const { email, password } = this.form.getRawValue();
+    this.auth.login({ identifier: email.trim(), password }).subscribe({
       next: () => {
         this.submitting.set(false);
         const role = this.auth.currentUser()?.role;

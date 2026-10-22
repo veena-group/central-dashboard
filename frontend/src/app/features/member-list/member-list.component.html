@@ -81,7 +81,7 @@
             <td><span class="badge badge-soft-primary">{{ member.role }}</span></td>
             <td class="text-muted-foreground">{{ member.wing }}-{{ member.flat }}</td>
             <td class="text-muted-foreground">{{ member.phone || '—' }}</td>
-            <td class="text-muted-foreground">{{ member.email }}</td>
+            <td class="text-muted-foreground">{{ member.email || '—' }}</td>
             <td>
               <div class="flex items-center justify-end gap-1">
                 <button type="button" class="btn btn-sm h-8 w-8 p-0 inline-flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary" (click)="openEditModal(member)" aria-label="Edit member" title="Edit">
@@ -180,10 +180,10 @@
                 </div>
 
                 <div>
-                  <label class="label required" for="memberEmail">Email</label>
+                  <label class="label" [class.required]="!isMobileLogin()" for="memberEmail">Email</label>
                   <input id="memberEmail" type="email" class="input" formControlName="email" placeholder="rohan@example.com">
                   @if (createForm.controls.email.invalid && createForm.controls.email.touched) {
-                    <p class="mt-1 text-xs text-destructive">Enter a valid email address.</p>
+                    <p class="mt-1 text-xs text-destructive">{{ isMobileLogin() ? 'Enter a valid email address, or leave it blank.' : 'Enter a valid email address.' }}</p>
                   }
                 </div>
 
@@ -198,10 +198,10 @@
                 </div>
 
                 <div>
-                  <label class="label" for="memberPhone">Phone</label>
+                  <label class="label" [class.required]="isMobileLogin()" for="memberPhone">Phone</label>
                   <input id="memberPhone" type="text" class="input" formControlName="phone" placeholder="e.g. 9876543210">
                   @if (createForm.controls.phone.invalid && createForm.controls.phone.touched) {
-                    <p class="mt-1 text-xs text-destructive">Enter a valid 10-digit Indian mobile number.</p>
+                    <p class="mt-1 text-xs text-destructive">{{ isMobileLogin() ? 'A valid 10-digit Indian mobile number is required.' : 'Enter a valid 10-digit Indian mobile number.' }}</p>
                   }
                 </div>
 
@@ -291,6 +291,7 @@
 
 <app-bulk-member-upload-modal
   [open]="showBulkUploadModal()"
+  [loginType]="loginType()"
   (closed)="closeBulkUploadModal()"
   (imported)="onBulkImportComplete()"></app-bulk-member-upload-modal>
 
@@ -361,10 +362,10 @@
                 </div>
 
                 <div class="form-field-full">
-                  <label class="label" for="editMemberPhone">Phone</label>
+                  <label class="label" [class.required]="isMobileLogin()" for="editMemberPhone">Phone</label>
                   <input id="editMemberPhone" type="text" class="input" formControlName="phone" placeholder="e.g. 9876543210">
                   @if (editForm.controls.phone.invalid && editForm.controls.phone.touched) {
-                    <p class="mt-1 text-xs text-destructive">Enter a valid 10-digit Indian mobile number.</p>
+                    <p class="mt-1 text-xs text-destructive">{{ isMobileLogin() ? 'A valid 10-digit Indian mobile number is required.' : 'Enter a valid 10-digit Indian mobile number.' }}</p>
                   }
                 </div>
               </div>

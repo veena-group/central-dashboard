@@ -1,5 +1,6 @@
 package com.veenagroup.central.dashboard.service;
 
+import com.veenagroup.central.dashboard.dto.superadmin.LoginTypeChangeBlockers;
 import com.veenagroup.central.dashboard.dto.superadmin.PlatformStatsResponse;
 import com.veenagroup.central.dashboard.dto.superadmin.SocietyAdminResponse;
 import com.veenagroup.central.dashboard.dto.superadmin.SocietyResponse;
@@ -7,6 +8,8 @@ import com.veenagroup.central.dashboard.dto.superadmin.UpdateSocietyRequest;
 import com.veenagroup.central.dashboard.entity.DomainRenewal;
 import com.veenagroup.central.dashboard.entity.Payment;
 import com.veenagroup.central.dashboard.entity.Society;
+import com.veenagroup.central.dashboard.entity.Users;
+import com.veenagroup.central.dashboard.entity.enums.LoginType;
 import com.veenagroup.central.dashboard.entity.enums.Role;
 import com.veenagroup.central.dashboard.exception.BusinessException;
 import com.veenagroup.central.dashboard.repository.DomainRenewalRepository;
@@ -14,6 +17,7 @@ import com.veenagroup.central.dashboard.repository.PaymentRepository;
 import com.veenagroup.central.dashboard.repository.SocietyRepository;
 import com.veenagroup.central.dashboard.repository.UsersRepository;
 import com.veenagroup.central.dashboard.storage.FileStorageService;
+import com.veenagroup.central.dashboard.util.ContactNormalizer;
 import com.veenagroup.central.dashboard.web.PageResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -26,7 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +41,7 @@ import java.util.Map;
 public class SocietyService {
 
     private static final int EXPIRING_SOON_DAYS = 30;
+    private static final int MAX_REPORTED_BLOCKERS = 200;
 
     private final SocietyRepository societyRepository;
     private final UsersRepository usersRepository;
@@ -109,6 +116,76 @@ public class SocietyService {
         Society updated = societyRepository.save(society);
         log.info("Updated society {}", updated.getId());
         return getById(updated.getId());
+    }
+
+    /**
+     * Switches how a society's members sign in. Refuses (409 with the offending members) unless every
+     * member already has the identifier the new type needs, and - for mobile - that each number is
+     * valid and unique within the society. Otherwise members would be silently locked out.
+     * Existing sessions are untouched; people simply use the new identifier next time they sign in.
+     */
+    @Transactional
+    public SocietyResponse changeLoginType(Long id, LoginType target) {
+        Society society = findOrThrow(id);
+        if (society.getLoginType() == target) {
+            return getById(id);
+        }
+
+        List<Users> members = usersRepository.findBySocietyId(id);
+        List<LoginTypeChangeBlockers.Blocker> blockers = findLoginTypeBlockers(members, target);
+        if (!blockers.isEmpty()) {
+            List<LoginTypeChangeBlockers.Blocker> shown = blockers.subList(0, Math.min(blockers.size(), MAX_REPORTED_BLOCKERS));
+            throw new BusinessException(HttpStatus.CONFLICT, "LOGIN_TYPE_CHANGE_BLOCKED",
+                    blockers.size() + " member(s) must be fixed before this society can sign in with "
+                            + (target == LoginType.EMAIL ? "email" : "mobile number"),
+                    new LoginTypeChangeBlockers(target.name(), blockers.size(), List.copyOf(shown)));
+        }
+
+        if (target == LoginType.MOBILE) {
+            // Store exactly what login compares against (e.g. "98765 43210" -> "9876543210").
+            for (Users member : members) {
+                member.setPhone(ContactNormalizer.mobile(member.getPhone()));
+            }
+            usersRepository.saveAll(members);
+        }
+
+        society.setLoginType(target);
+        societyRepository.save(society);
+        log.info("Society {} login type changed to {}", id, target);
+        return getById(id);
+    }
+
+    private List<LoginTypeChangeBlockers.Blocker> findLoginTypeBlockers(List<Users> members, LoginType target) {
+        List<LoginTypeChangeBlockers.Blocker> blockers = new ArrayList<>();
+
+        if (target == LoginType.EMAIL) {
+            for (Users member : members) {
+                if (ContactNormalizer.email(member.getEmail()) == null) {
+                    blockers.add(blocker(member, "MISSING_EMAIL"));
+                }
+            }
+            return blockers;
+        }
+
+        Map<String, List<Users>> byPhone = new LinkedHashMap<>();
+        for (Users member : members) {
+            String phone = ContactNormalizer.mobile(member.getPhone());
+            if (phone == null) {
+                blockers.add(blocker(member, "MISSING_PHONE"));
+            } else if (!ContactNormalizer.isValidMobile(phone)) {
+                blockers.add(blocker(member, "INVALID_PHONE"));
+            } else {
+                byPhone.computeIfAbsent(phone, key -> new ArrayList<>()).add(member);
+            }
+        }
+        byPhone.values().stream()
+                .filter(group -> group.size() > 1)
+                .forEach(group -> group.forEach(member -> blockers.add(blocker(member, "DUPLICATE_PHONE"))));
+        return blockers;
+    }
+
+    private LoginTypeChangeBlockers.Blocker blocker(Users member, String reason) {
+        return new LoginTypeChangeBlockers.Blocker(member.getId(), member.getName(), member.getFlat(), member.getWing(), reason);
     }
 
     @Transactional
@@ -225,7 +302,8 @@ public class SocietyService {
                 hostingState(hostingExpiry),
                 nextDue,
                 subscriptionState(nextDue),
-                society.getCreatedAt()
+                society.getCreatedAt(),
+                society.getLoginType().name()
         );
     }
 

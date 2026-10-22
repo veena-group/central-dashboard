@@ -1,8 +1,11 @@
 package com.veenagroup.central.dashboard.controller;
 
+import com.veenagroup.central.dashboard.dto.auth.LoginConfigResponse;
 import com.veenagroup.central.dashboard.dto.auth.LoginRequest;
 import com.veenagroup.central.dashboard.dto.auth.LoginResponse;
 import com.veenagroup.central.dashboard.dto.auth.RefreshTokenRequest;
+import com.veenagroup.central.dashboard.entity.Society;
+import com.veenagroup.central.dashboard.entity.enums.LoginType;
 import com.veenagroup.central.dashboard.entity.enums.Role;
 import com.veenagroup.central.dashboard.exception.BusinessException;
 import com.veenagroup.central.dashboard.repository.UsersRepository;
@@ -11,6 +14,7 @@ import com.veenagroup.central.dashboard.security.CustomUserDetails;
 import com.veenagroup.central.dashboard.security.CustomUserDetailsService;
 import com.veenagroup.central.dashboard.security.JwtService;
 import com.veenagroup.central.dashboard.security.LoginAttemptService;
+import com.veenagroup.central.dashboard.security.LoginIdentityService;
 import com.veenagroup.central.dashboard.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -19,8 +23,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,18 +45,21 @@ public class AuthController {
     private final CustomUserDetailsService userDetailsService;
     private final UsersRepository usersRepository;
     private final LoginAttemptService loginAttemptService;
+    private final LoginIdentityService loginIdentityService;
     private final CurrentUser currentUser;
     private final boolean domainValidationEnabled;
 
     public AuthController(AuthenticationManager authenticationManager, JwtService jwtService,
                            CustomUserDetailsService userDetailsService, UsersRepository usersRepository,
-                           LoginAttemptService loginAttemptService, CurrentUser currentUser,
+                           LoginAttemptService loginAttemptService,
+                           LoginIdentityService loginIdentityService, CurrentUser currentUser,
                            @Value("${app.security.domain-validation.enabled:true}") boolean domainValidationEnabled) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.usersRepository = usersRepository;
         this.loginAttemptService = loginAttemptService;
+        this.loginIdentityService = loginIdentityService;
         this.currentUser = currentUser;
         this.domainValidationEnabled = domainValidationEnabled;
     }
@@ -57,38 +67,61 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
                                                               HttpServletRequest httpRequest) {
-        loginAttemptService.assertNotLocked(request.email());
+        String identifier = request.resolvedIdentifier();
+        if (identifier == null || identifier.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Email or mobile number is required");
+        }
+
+        Society society = loginIdentityService.findSocietyByDomain(extractRequestDomain(httpRequest)).orElse(null);
+        Long userId = loginIdentityService.resolveUserId(identifier, society)
+                .orElseThrow(() -> new BadCredentialsException("No matching account"));
+
+        loginAttemptService.assertNotLocked(userId);
 
         CustomUserDetails userDetails;
         try {
             var authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+                    new UsernamePasswordAuthenticationToken(String.valueOf(userId), request.password()));
             userDetails = (CustomUserDetails) authentication.getPrincipal();
         } catch (AuthenticationException e) {
-            loginAttemptService.registerFailedAttempt(request.email());
+            loginAttemptService.registerFailedAttempt(userId);
             throw e;
         }
 
-        loginAttemptService.resetFailedAttempts(request.email());
+        loginAttemptService.resetFailedAttempts(userId);
         validateDomain(userDetails, httpRequest);
         LoginResponse response = buildLoginResponse(userDetails);
 
-        log.info("Login successful for user {}", request.email());
+        log.info("Login successful for user {}", userId);
 
         return ResponseEntity.ok(ApiResponse.of("Login successful", response));
+    }
+
+    /**
+     * Tells a login page which identifier to ask for. Public and keyed off the request's Origin,
+     * so each society's own site needs no per-society configuration (and a later login-type change
+     * needs no redeploy). Anything we can't map to a society - the central dashboard's own super
+     * admin login, a local dev origin - gets EMAIL.
+     */
+    @GetMapping("/login-config")
+    public ResponseEntity<ApiResponse<LoginConfigResponse>> loginConfig(HttpServletRequest httpRequest) {
+        LoginType loginType = loginIdentityService.findSocietyByDomain(extractRequestDomain(httpRequest))
+                .map(Society::getLoginType)
+                .orElse(LoginType.EMAIL);
+        return ResponseEntity.ok(ApiResponse.of("Login config fetched", new LoginConfigResponse(loginType.name())));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<LoginResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request,
                                                                 HttpServletRequest httpRequest) {
-        String email;
+        CustomUserDetails userDetails;
         try {
-            email = jwtService.extractEmailFromRefreshToken(request.refreshToken());
-        } catch (IllegalArgumentException e) {
+            String subject = jwtService.extractSubjectFromRefreshToken(request.refreshToken());
+            userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(subject);
+        } catch (IllegalArgumentException | UsernameNotFoundException e) {
+            // Includes refresh tokens issued before the id-subject switch (their subject is an email).
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid or expired refresh token");
         }
-
-        CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
         if (!jwtService.isRefreshTokenValid(request.refreshToken(), userDetails)) {
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid or expired refresh token");
         }
@@ -96,7 +129,7 @@ public class AuthController {
         validateDomain(userDetails, httpRequest);
         LoginResponse response = buildLoginResponse(userDetails);
 
-        log.info("Token refreshed for user {}", email);
+        log.info("Token refreshed for user {}", userDetails.getUserId());
 
         return ResponseEntity.ok(ApiResponse.of("Token refreshed successfully", response));
     }
@@ -178,7 +211,7 @@ public class AuthController {
                 jwtService.getAccessExpirationSeconds(),
                 userDetails.getUserId(),
                 userDetails.getName(),
-                userDetails.getUsername(),
+                userDetails.getEmail(),
                 userDetails.getPhotoUrl(),
                 userDetails.getSocietyName(),
                 userDetails.getSocietyLogoUrl(),
@@ -186,7 +219,9 @@ public class AuthController {
                 userDetails.getSecondaryColor(),
                 userDetails.getRole().name(),
                 userDetails.getSocietyId(),
-                userDetails.getSocietyDomain()
+                userDetails.getSocietyDomain(),
+                userDetails.getPhone(),
+                userDetails.getLoginType().name()
         );
     }
 }

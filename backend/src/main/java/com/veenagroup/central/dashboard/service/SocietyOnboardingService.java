@@ -8,12 +8,14 @@ import com.veenagroup.central.dashboard.entity.Society;
 import com.veenagroup.central.dashboard.entity.SocietyFeature;
 import com.veenagroup.central.dashboard.entity.Users;
 import com.veenagroup.central.dashboard.entity.enums.FeatureKey;
+import com.veenagroup.central.dashboard.entity.enums.LoginType;
 import com.veenagroup.central.dashboard.entity.enums.Role;
 import com.veenagroup.central.dashboard.exception.BusinessException;
 import com.veenagroup.central.dashboard.repository.DomainRenewalRepository;
 import com.veenagroup.central.dashboard.repository.SocietyFeatureRepository;
 import com.veenagroup.central.dashboard.repository.SocietyRepository;
 import com.veenagroup.central.dashboard.repository.UsersRepository;
+import com.veenagroup.central.dashboard.util.ContactNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,13 +57,27 @@ public class SocietyOnboardingService {
         if (societyRepository.findByDomain(request.domain()).isPresent()) {
             throw new BusinessException(HttpStatus.CONFLICT, "DOMAIN_ALREADY_IN_USE", "Domain already in use");
         }
-        if (usersRepository.findByEmail(request.adminEmail()).isPresent()) {
+
+        LoginType loginType = request.loginType() != null ? request.loginType() : LoginType.EMAIL;
+        String adminEmail = ContactNormalizer.email(request.adminEmail());
+        String adminPhone = ContactNormalizer.mobile(request.adminPhone());
+        if (loginType == LoginType.EMAIL && adminEmail == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "EMAIL_REQUIRED", "Admin email is required when the society signs in with email");
+        }
+        if (loginType == LoginType.MOBILE && adminPhone == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "PHONE_REQUIRED", "Admin mobile number is required when the society signs in with mobile");
+        }
+        if (adminPhone != null && !ContactNormalizer.isValidMobile(adminPhone)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Phone number must be a valid 10-digit Indian mobile number");
+        }
+        if (adminEmail != null && usersRepository.findByEmail(adminEmail).isPresent()) {
             throw new BusinessException(HttpStatus.CONFLICT, "EMAIL_ALREADY_IN_USE", "Email already in use");
         }
 
         Society society = Society.builder()
                 .name(request.societyName())
                 .domain(request.domain())
+                .loginType(loginType)
             .primaryColor(normalizeColor(request.primaryColor(), "#0F766E"))
             .secondaryColor(normalizeColor(request.secondaryColor(), "#F59E0B"))
                 .build();
@@ -76,8 +92,8 @@ public class SocietyOnboardingService {
         Users admin = Users.builder()
                 .society(society)
                 .name(request.adminName())
-                .email(request.adminEmail())
-                .phone(request.adminPhone())
+                .email(adminEmail)
+                .phone(adminPhone)
                 .role(Role.SOCIETY_ADMIN)
                 .passwordHash(passwordEncoder.encode(request.adminPassword()))
                 .build();
@@ -89,7 +105,7 @@ public class SocietyOnboardingService {
         log.info("Onboarded society {} (id={}, domain={}) with admin id {}",
                 society.getName(), society.getId(), society.getDomain(), admin.getId());
         return new OnboardSocietyResponse(society.getId(), society.getName(), society.getDomain(),
-                admin.getId(), admin.getEmail());
+                admin.getId(), admin.getEmail(), admin.getPhone(), society.getLoginType().name());
     }
 
     private List<SocietyFeature> buildFeatureRows(Society society, List<FeatureConfigRequest> requested) {

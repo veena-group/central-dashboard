@@ -78,7 +78,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthEntryPoint)
                         .accessDeniedHandler(jwtAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/public/**", "/error").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/login-config", "/api/auth/refresh", "/api/public/**", "/error").permitAll()
                         .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "SOCIETY_ADMIN")
                         .requestMatchers("/api/member/**").hasAnyRole("SUPER_ADMIN", "SOCIETY_ADMIN", "MEMBER")

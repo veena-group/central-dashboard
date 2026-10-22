@@ -1,6 +1,7 @@
 package com.veenagroup.central.dashboard.security;
 
 import com.veenagroup.central.dashboard.entity.Users;
+import com.veenagroup.central.dashboard.entity.enums.LoginType;
 import com.veenagroup.central.dashboard.entity.enums.Role;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,6 +16,8 @@ public class CustomUserDetails implements UserDetails {
     private final Long societyId;
     private final String name;
     private final String email;
+    private final String phone;
+    private final LoginType loginType;
     private final String photoUrl;
     private final String societyName;
     private final String societyDomain;
@@ -31,6 +34,9 @@ public class CustomUserDetails implements UserDetails {
         this.societyId = user.getSociety() != null ? user.getSociety().getId() : null;
         this.name = user.getName();
         this.email = user.getEmail();
+        this.phone = user.getPhone();
+        // Super admin has no society and always signs in by email.
+        this.loginType = user.getSociety() != null ? user.getSociety().getLoginType() : LoginType.EMAIL;
         this.photoUrl = user.getPhotoUrl();
         this.societyName = user.getSociety() != null ? user.getSociety().getName() : null;
         this.societyDomain = user.getSociety() != null ? user.getSociety().getDomain() : null;
@@ -47,6 +53,19 @@ public class CustomUserDetails implements UserDetails {
 
     public String getName() {
         return name;
+    }
+
+    /** May be null for a society that signs in by mobile. */
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public LoginType getLoginType() {
+        return loginType;
     }
 
     public Long getSocietyId() {
@@ -95,8 +114,12 @@ public class CustomUserDetails implements UserDetails {
         return passwordHash;
     }
 
+    /**
+     * The user id, not the email: a mobile-login member may have no email at all, and ids never
+     * change when a member's email or phone does. CustomUserDetailsService resolves it back.
+     */
     @Override
     public String getUsername() {
-        return email;
+        return String.valueOf(userId);
     }
 }
